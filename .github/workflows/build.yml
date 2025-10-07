@@ -185,3 +185,60 @@ jobs:
           name: apple-natives
           path: ./luajava/*/libs
           retention-days: 5
+
+  linux-testing:
+    runs-on: ubuntu-latest
+    needs:
+      - most-natives
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+      - name: Set up JDK 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+      - run: echo "JAVA_8=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+      - run: echo "JAVA_11=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+      - name: Download most-natives artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: most-natives
+          path: luajava
+      - name: Download luajava folder artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: luajava-folder
+          path: luajava
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run-id || github.event.workflow_run.id }}
+      - name: JniGen
+        run: |
+          cd luajava
+          chmod +x gradlew
+          ./gradlew jniGen
+      - name: Build example
+        run: |
+          cd luajava
+          chmod +x gradlew
+          ./gradlew :example:shadowJar
+      - name: Test on Ubuntu 14.04
+        run: |
+          cd luajava
+          chmod +x gradlew
+          sudo docker build -t ljtest-glibc -f example/docker/glibc/Dockerfile example/build/libs
+          sudo docker run --rm ljtest-glibc
+      - name: Test on Alpine
+        run: |
+          cd luajava
+          chmod +x gradlew
+          sudo docker build -t ljtest-musl -f example/docker/musl/Dockerfile example/build/libs
+          sudo docker run --rm ljtest-musl
