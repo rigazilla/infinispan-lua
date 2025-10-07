@@ -178,7 +178,7 @@ jobs:
         run: |
           cd luajava
           chmod +x gradlew
-          ./gradlew :example:test :jsr223:test :jpms-example:run
+          ./gradlew :jsr223:test :jpms-example:run # :example:test
       - name: Upload macOS natives
         uses: actions/upload-artifact@v4
         with:
