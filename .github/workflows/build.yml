@@ -116,7 +116,7 @@ jobs:
       - name: Test (Desktop)
         run: |
           cd luajava
-          ./gradlew --info --stacktrace :jsr223:test :jpms-example:run #  :example:test
+          ./gradlew --info --stacktrace :example:test :jsr223:test :jpms-example:run
           
       - name: Jacoco Test Report
         run: |
@@ -146,6 +146,7 @@ jobs:
             ./luajava/*/libs
             ./luajava/**/*.jar
           retention-days: 5
+
   apple-natives:
     runs-on: macos-13
     env:
@@ -178,7 +179,7 @@ jobs:
         run: |
           cd luajava
           chmod +x gradlew
-          ./gradlew :jsr223:test :jpms-example:run # :example:test
+          ./gradlew :example:test :jsr223:test :jpms-example:run
       - name: Upload macOS natives
         uses: actions/upload-artifact@v4
         with:
@@ -242,3 +243,47 @@ jobs:
           chmod +x gradlew
           sudo docker build -t ljtest-musl -f example/docker/musl/Dockerfile example/build/libs
           sudo docker run --rm ljtest-musl
+
+  windows-testing:
+    runs-on: windows-latest
+    needs:
+      - most-natives
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+      - name: Set up JDK 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+      - run: echo "JAVA_8=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+      - run: echo "JAVA_11=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+      - name: Download most-natives artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: most-natives
+      - name: Download luajava folder artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: luajava-folder
+          path: luajava
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run-id || github.event.workflow_run.id }}
+      - name: JniGen
+        run: |
+          cd luajava
+          chmod +x gradlew
+          ./gradlew jniGen
+      - name: Test
+        run: |
+          cd luajava
+          chmod +x gradlew
+          ./gradlew --info --stacktrace :example:test :jsr223:test :jpms-example:run
