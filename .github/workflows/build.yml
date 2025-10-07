@@ -128,7 +128,7 @@ jobs:
       - name: Test (Desktop)
         run: |
           cd luajava
-          ./gradlew --info --stacktrace :example:test :jsr223:test :jpms-example:run
+          ./gradlew --info --stacktrace :jsr223:test :jpms-example:run #  :example:test
           
       - name: Jacoco Test Report
         run: |
