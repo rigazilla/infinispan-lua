@@ -10,17 +10,6 @@ on:
         description: "The run ID of the workflow run that uploaded the luajava-folder artifact."
         required: true
         type: string
-  pull_request:
-    branches: [main]
-  push:
-    tags:
-      - '*'
-    paths-ignore:
-      - '.github/**'
-      - 'docs/**'
-      - 'README.md'
-    branches:
-      - main
 
 jobs:
   most-natives:
