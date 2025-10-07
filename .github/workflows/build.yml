@@ -1,0 +1,78 @@
+# .github/workflows/clone-repo.yml
+
+# Name for the workflow, which will be displayed in the GitHub Actions tab
+name: Clone External Repository
+
+# Controls when the workflow will run
+on:
+  # Allows you to run this workflow manually from the Actions tab in GitHub
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "clone-and-verify"
+  clone-and-verify:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Step 1: Checks out your repository under $GITHUB_WORKSPACE, so your job can access it.
+      - name: Checkout main repository
+        uses: actions/checkout@v4
+
+      # Step 2: Clones the specified repository into the 'luajava' subfolder.
+      - name: Clone luajava repository
+        uses: actions/checkout@v4
+        with:
+          # The repository to clone. Format: owner/repo
+          repository: 'gudzpoz/luajava'
+          # The destination path for the cloned repository.
+          path: 'luajava'
+          fetch-depth: 1
+          submodules: true
+
+      # Step 3: Clones the "deps/lua" folder from "redis/redis" into the 'lua-native' subfolder.
+      - name: Clone redis/redis deps/lua folder
+        uses: actions/checkout@v4
+        with:
+          repository: 'redis/redis'
+          path: 'lua-native'
+          sparse-checkout: |
+            deps/lua
+          sparse-checkout-cone-mode: false
+          fetch-depth: 1
+
+      - name: Replace luajava/lua51/jni/lua51 with lua-native content
+        run: |
+          rm -rf luajava/lua51/jni/lua51
+          cp -r lua-native/deps/lua luajava/lua51/jni/lua51
+
+      - name: Replace luajava with ispn-luajava content
+        run: |
+          cp -r ispn-luajava/* luajava/
+
+      - name: Archive luajava folder
+        uses: actions/upload-artifact@v4
+        with:
+          name: luajava-folder
+          path: luajava
+
+  extract-artifact:
+    needs: clone-and-verify
+    # runs-on: ubuntu-latest
+    # container: 
+    #     image: ubuntu:20.04
+    #     env:
+    #         DEBIAN_FRONTEND: noninteractive
+    runs-on: ubuntu-20.04
+    env:
+        DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Download luajava folder artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: luajava-folder
+          path: luajava
+      - name: Build and Pack
+        uses: ./.github/actions/build
