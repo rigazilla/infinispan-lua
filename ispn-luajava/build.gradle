@@ -1,0 +1,80 @@
+group 'org.infinispan'
+
+def versionEnv = System.getenv('VERSION')
+if (!versionEnv) {
+    throw new GradleException('VERSION environment variable must be set')
+}
+version(versionEnv)
+
+// ✅ Ensure all Java compile tasks use UTF-8
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.withType(Javadoc) {
+    options.encoding = 'UTF-8'
+    options.charSet = 'UTF-8'
+    options.docEncoding = 'UTF-8'
+}
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.4.2'
+    }
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+subprojects { it ->
+    if (!['android', 'android-test', 'jpms-example'].contains(it.name)) {
+        apply plugin: 'java'
+
+        java {
+            toolchain {
+                languageVersion = JavaLanguageVersion.of(8)
+            }
+
+            withSourcesJar()
+            withJavadocJar()
+        }
+    }
+}
+
+ext {
+    jdk = JavaVersion.current().majorVersion
+    jdkJavadoc = "https://docs.oracle.com/javase/8/docs/api/"
+    println "JDK Javadoc link for this build is ${rootProject.jdkJavadoc}"
+}
+
+apply from: 'publish.gradle'
+apply from: 'jacoco.gradle'
+
+tasks.register('allJavadoc', Javadoc) {
+    Set<String> projects = [
+            'lua51',
+            'lua52',
+            'lua53',
+            'lua54',
+            'luajit',
+            'luaj',
+            'luajava',
+    ]
+    source subprojects
+            .findAll { projects.contains(it.name) }
+            .collect { it.sourceSets.main.allJava }
+    classpath = files(subprojects.findAll { projects.contains(it.name) }
+            .collect { it.sourceSets.main.compileClasspath })
+    exclude(
+            '**/party/iroiro/luajava/util/**',
+            '**/party/iroiro/luajava/cleaner/**',
+    )
+    destinationDir = file("${buildDir}/docs/javadoc")
+}

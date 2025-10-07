@@ -1,0 +1,416 @@
+name: Docker Build and Publish
+
+on:
+  workflow_run:
+    workflows: [Create Source Artifact]
+    types: [completed]
+  workflow_dispatch: 
+    inputs:
+      run-id:
+        description: "The run ID of the workflow run that uploaded the luajava-folder artifact."
+        required: true
+        type: string
+
+jobs:
+  most-natives:
+    environment: Codecov
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:20.04
+      env:
+        DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Install basic dependencies
+        run: |
+          apt-get update
+          apt-get install -y curl wget git build-essential software-properties-common
+          apt-get install -y ca-certificates gnupg lsb-release
+          apt-get install -y ant unzip
+
+      - name: Download luajava folder artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: luajava-folder
+          path: luajava
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run-id || github.event.workflow_run.id }}
+
+      - name: Set version from artifact
+        run: |
+          if [ -f luajava/version.txt ]; then
+            echo "VERSION=$(cat luajava/version.txt)" >> $GITHUB_ENV
+          fi
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+      - run: echo "JAVA_8=$JAVA_HOME" >> $GITHUB_ENV
+      
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - run: echo "JAVA_17=$JAVA_HOME" >> $GITHUB_ENV
+      
+      - name: Download llvm-mingw
+        uses: robinraju/release-downloader@v1.10
+        with:
+          repository: 'mstorsjo/llvm-mingw'
+          tag: 20240619
+          fileName: llvm-mingw-20240619-ucrt-ubuntu-20.04-x86_64.tar.xz
+          tarBall: false
+          zipBall: false
+          
+      - name: Set up llvm-mingw
+        run: |
+          mkdir -p /usr/local
+          tar -Jxf llvm-mingw-20240619-ucrt-ubuntu-20.04-x86_64.tar.xz -C /usr/local
+          echo "/usr/local/llvm-mingw-20240619-ucrt-ubuntu-20.04-x86_64/bin" >> $GITHUB_PATH
+          
+      - name: Install cross-compilation toolchains
+        run: |
+          apt update
+          # x86_64
+          apt install -y --force-yes gcc g++
+          apt install -y --force-yes libc6-dev linux-libc-dev linux-libc-dev-amd64-cross
+          # x86
+          apt install -y --force-yes gcc-i686-linux-gnu g++-i686-linux-gnu
+          apt install -y --force-yes lib32stdc++-9-dev libstdc++-9-dev-i386-cross
+          apt install -y --force-yes libc6-dev-i386 libc6-dev-i386-cross linux-libc-dev-i386-cross
+          apt install -y g++-multilib
+          # arm64
+          apt install -y --force-yes gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc6-dev-arm64-cross
+          apt install -y --force-yes libstdc++-9-dev-arm64-cross linux-libc-dev-arm64-cross
+          # armhf
+          apt install -y --force-yes gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf libc6-dev-armhf-cross
+          apt install -y --force-yes libstdc++-9-dev-armhf-cross linux-libc-dev-armhf-cross
+          # TODO: riscv64
+          # Windows
+          apt install -y --force-yes mingw-w64 lib32z1
+          
+      - name: Install additional dependencies for PatchELF
+        run: |
+          apt install -y autoconf automake libtool make
+          
+      - name: Install PatchELF (verneed-fix)
+        run: |
+          git clone https://github.com/gudzpoz/patchelf.git
+          cd patchelf
+          git checkout 1684a4606be1fef189d04a465adc0c9d31421dac
+          ./bootstrap.sh
+          ./configure
+          make
+          make check
+          `pwd`/src/patchelf --version
+          echo "`pwd`/src" >> $GITHUB_PATH
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+        
+      - name: Build natives
+        run: |
+          cd luajava
+          chmod +x gradlew
+          echo $PATH
+          which aarch64-w64-mingw32-gcc || echo "not found"
+          ls /usr/local/llvm-mingw-20240619-ucrt-ubuntu-20.04-x86_64/bin
+          ./gradlew --info --stacktrace jniGen jnigenBuildLinux jnigenBuildLinux64
+          ./gradlew jniGen jnigenBuildLinuxARM jnigenBuildLinuxARM64
+          # TODO: ./gradlew jniGen jnigenBuildLinuxRISCV64
+          ./gradlew jniGen jnigenBuildWindows jnigenBuildWindows64 jnigenBuildWindowsARM64 # skip jnigenBuildAndroid
+          
+      - name: Test (Desktop)
+        run: |
+          cd luajava
+          ./gradlew --info --stacktrace :example:test :jsr223:test :jpms-example:run
+          
+      - name: Jacoco Test Report
+        run: |
+          cd luajava
+          ./gradlew jacocoTestReport
+          
+      - name: Upload test result
+        uses: codecov/codecov-action@v4
+        with:
+          files: >-
+            ./luajava/lua51/build/reports/jacoco/report.xml,
+            ./luajava/lua52/build/reports/jacoco/report.xml,
+            ./luajava/lua53/build/reports/jacoco/report.xml,
+            ./luajava/lua54/build/reports/jacoco/report.xml,
+            ./luajava/luajit/build/reports/jacoco/report.xml,
+            ./luajava/luaj/build/reports/jacoco/report.xml,
+            ./luajava/luajava/build/reports/jacoco/report.xml,
+            ./luajava/jsr223/build/reports/jacoco/report.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
+          
+      - name: Upload all output libs
+        uses: actions/upload-artifact@v4
+        with:
+          name: most-natives
+          path: |
+            ./luajava/*/libs
+            ./luajava/**/*.jar
+          retention-days: 5
+
+  apple-natives:
+    runs-on: macos-13
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "10.10"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - run: echo "JAVA_17=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+      - name: Download luajava folder artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: luajava-folder
+          path: luajava
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run-id || github.event.workflow_run.id }}
+      - name: Set version from artifact
+        run: |
+          if [ -f luajava/version.txt ]; then
+            echo "VERSION=$(cat luajava/version.txt)" >> $GITHUB_ENV
+          fi
+      - name: Build natives
+        run: |
+          cd luajava
+          chmod +x gradlew
+          ./gradlew jniGen jnigenBuildMacOsX64 jnigenBuildMacOsXARM64 jnigenBuildIOS
+      - name: Test
+        run: |
+          cd luajava
+          chmod +x gradlew
+          ./gradlew :example:test :jsr223:test :jpms-example:run
+      - name: Upload macOS natives
+        uses: actions/upload-artifact@v4
+        with:
+          name: apple-natives
+          path: ./luajava/*/libs
+          retention-days: 5
+
+  linux-testing:
+    runs-on: ubuntu-latest
+    needs:
+      - most-natives
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+      - name: Set up JDK 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+      - run: echo "JAVA_8=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+      - run: echo "JAVA_11=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+      - name: Download most-natives artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: most-natives
+          path: luajava
+      - name: Download luajava folder artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: luajava-folder
+          path: luajava
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run-id || github.event.workflow_run.id }}
+      - name: Set version from artifact
+        run: |
+          if [ -f luajava/version.txt ]; then
+            echo "VERSION=$(cat luajava/version.txt)" >> $GITHUB_ENV
+          fi
+      - name: JniGen
+        run: |
+          cd luajava
+          chmod +x gradlew
+          ./gradlew jniGen
+      - name: Build example
+        run: |
+          cd luajava
+          chmod +x gradlew
+          ./gradlew :example:shadowJar
+      - name: Test on Ubuntu 14.04
+        run: |
+          cd luajava
+          chmod +x gradlew
+          sudo docker build -t ljtest-glibc -f example/docker/glibc/Dockerfile example/build/libs
+          sudo docker run --rm ljtest-glibc
+      - name: Test on Alpine
+        run: |
+          cd luajava
+          chmod +x gradlew
+          sudo docker build -t ljtest-musl -f example/docker/musl/Dockerfile example/build/libs
+          sudo docker run --rm ljtest-musl
+
+  windows-testing:
+    runs-on: windows-latest
+    needs:
+      - most-natives
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+      - name: Set up JDK 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+      - run: echo "JAVA_8=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+      - run: echo "JAVA_11=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+      - name: Download most-natives artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: most-natives
+          path: luajava
+      - name: Download luajava folder artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: luajava-folder
+          path: luajava
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run-id || github.event.workflow_run.id }}
+      - name: Set version from artifact
+        shell: pwsh
+        run: |
+          if (Test-Path luajava/version.txt) {
+            $version = Get-Content luajava/version.txt
+            echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
+      - name: JniGen
+        run: |
+          cd luajava
+          chmod +x gradlew
+          ./gradlew jniGen
+      - name: Test
+        run: |
+          cd luajava
+          chmod +x gradlew
+          ./gradlew --info --stacktrace :example:test :jsr223:test :jpms-example:run
+  pack-natives:
+    environment: OSSRH
+    needs:
+      - apple-natives
+      - most-natives
+      - windows-testing
+      - linux-testing
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+      - name: Set up JDK 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+      - run: echo "JAVA_8=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+      - run: echo "JAVA_11=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+      - name: Download apple-natives artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: apple-natives
+          path: luajava
+      - name: Download most-natives artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: most-natives
+          path: luajava
+      - name: Download luajava folder artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: luajava-folder
+          path: luajava
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run-id || github.event.workflow_run.id }}
+      - name: Set version from artifact
+        run: |
+          if [ -f luajava/version.txt ]; then
+            echo "VERSION=$(cat luajava/version.txt)" >> $GITHUB_ENV
+          fi
+      - name: JniGen
+        run: |
+          cd luajava
+          chmod +x gradlew
+          ./gradlew jniGen
+      - name: Pack desktop natives
+        run: |
+          cd luajava
+          chmod +x gradlew
+          ant -f lua51/jni/build.xml pack-natives
+          ant -f lua52/jni/build.xml pack-natives
+          ant -f lua53/jni/build.xml pack-natives
+          ant -f lua54/jni/build.xml pack-natives
+          ant -f luajit/jni/build.xml pack-natives
+      - name: Build
+        run: |
+          cd luajava
+          chmod +x gradlew
+          ./gradlew build -x test
+      - name: Publish to local Maven repository
+        run: |
+          cd luajava
+          ./gradlew :lua51:publishMavenPlatformPublicationToMavenLocal -PskipSigning -PpublishOnlyDesktop=true
+      - name: Verify local Maven publication
+        run: |
+          echo "Listing lua51 artifacts in local Maven repository:"
+          ls -lR $HOME/.m2/repository/party/iroiro/luajava/lua51/ || echo "lua51 artifacts not found"
+          echo ""
+          echo "Listing all luajava artifacts:"
+          ls -lR $HOME/.m2/repository/party/iroiro/luajava/ || echo "luajava artifacts not found"
+          echo "(org.infinispan) Listing infinispan-lua51 artifacts in local Maven repository:"
+          ls -lR $HOME/.m2/repository/org/infinispan/ || echo "infinispan artifacts not found"
+          ls -lR $HOME/.m2/repository/org/infinispan/infinispan-lua51-platform/ || echo "lua51 artifacts not found"
+          cat $HOME/.m2/repository/org/infinispan/infinispan-lua51-platform/1.0.0-SNAPSHOT/*.pom || echo "no POM"
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: natives
+          path: ./luajava/**/build/libs/*-natives-desktop.jar
+      - name: Publish to OSSRH
+        if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+          GPG_KEY_ID: ${{ secrets.SIGNING_KEY_ID }}
+          GPG_PASSPHRASE: ${{ secrets.SIGNING_PASSPHRASE }}
+          GPG_SECKEY: ${{ secrets.SIGNING_SECRET_KEY }}
+          GITHUB_REF: ${{ github.ref }}
+        run: |
+          cd luajava
+          ./gradlew :lua51:publishMavenPlatformPublicationToOSSRHRepository -PpublishOnlyDesktop=true --info --stacktrace -Dorg.gradle.parallel=false
