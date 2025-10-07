@@ -107,7 +107,6 @@ jobs:
       - name: Build natives
         run: |
           cd luajava
-          which make
           chmod +x gradlew
           ./gradlew --info --stacktrace jniGen jnigenBuildLinux jnigenBuildLinux64
           ./gradlew jniGen jnigenBuildLinuxARM jnigenBuildLinuxARM64
@@ -144,8 +143,8 @@ jobs:
         with:
           name: most-natives
           path: |
-            ./*/libs
-            ./**/*.jar
+            ./luajava/*/libs
+            ./luajava/**/*.jar
           retention-days: 5
   apple-natives:
     runs-on: macos-13
@@ -161,8 +160,17 @@ jobs:
       - run: echo "JAVA_17=$JAVA_HOME" >> $GITHUB_ENV
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
+      - name: Download luajava folder artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: luajava-folder
+          path: luajava
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run-id || github.event.workflow_run.id }}
       - name: Build natives
         run: |
+          cd luajava
+          chmod +x gradlew
           ./gradlew jniGen jnigenBuildMacOsX64 jnigenBuildMacOsXARM64 jnigenBuildIOS
       - name: Test
         run: |
@@ -171,5 +179,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: apple-natives
-          path: ./*/libs
+          path: ./luajava/*/libs
           retention-days: 5
