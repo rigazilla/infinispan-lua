@@ -350,4 +350,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: natives
-          path: ./luajava/*/libs
+          path: |
+            ./luajava/*/libs
+            ./luajava/**/*.jar
