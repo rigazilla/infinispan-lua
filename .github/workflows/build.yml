@@ -345,11 +345,6 @@ jobs:
           ant -f lua53/jni/build.xml pack-natives
           ant -f lua54/jni/build.xml pack-natives
           ant -f luajit/jni/build.xml pack-natives
-      - name: Publish
-        run: |
-          cd luajava
-          chmod +x gradlew
-          ./gradlew build -x test
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
