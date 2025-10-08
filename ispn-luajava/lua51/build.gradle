@@ -20,17 +20,6 @@ repositories {
 group = rootProject.group
 version = rootProject.version
 
-// ✅ Ensure all Java compile tasks use UTF-8
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
-}
-
-tasks.withType(Javadoc) {
-    options.encoding = 'UTF-8'
-    options.charSet = 'UTF-8'
-    options.docEncoding = 'UTF-8'
-}
-
 configurations {
     desktopNatives {
         canBeConsumed = true
@@ -51,14 +40,12 @@ dependencies {
 apply plugin: 'com.badlogicgames.gdx.gdx-jnigen'
 
 jnigen {
-    sharedLibName = 'lua52'
+    sharedLibName = 'lua51'
 
     all {
-        cFlags += ' -DLUA_COMPAT_ALL'
-        cppFlags += ' -DLUA_COMPAT_ALL'
-        headerDirs = ['../../jni/luajava', 'mod', 'lua52']
-        cppExcludes = ['lua52/**/*']
-        cExcludes = ['lua52/**/*']
+        headerDirs = ['../../jni/luajava', 'mod', 'lua51/src', 'lua51/etc']
+        cppExcludes = ['lua51/**/*']
+        cExcludes = ['lua51/**/*']
         libraries = ' -lm '
     }
 
@@ -87,22 +74,22 @@ jnigen {
         cppFlags += macFlags
     }
 
-    // add(Android) {
-    //     String androidFlags = ' -D_FORTIFY_SOURCE=1 -DLUA_USE_DLOPEN '
-    //     cFlags += androidFlags
-    //     cppFlags += androidFlags
-    //     androidApplicationMk = [
-    //             'APP_PLATFORM := android-21',
-    //             "APP_CFLAG :=$androidFlags",
-    //     ]
-    // }
+    add(Android) {
+        String androidFlags = ' -D_FORTIFY_SOURCE=1 -DLUA_USE_DLOPEN '
+        cFlags += androidFlags
+        cppFlags += androidFlags
+        androidApplicationMk = [
+                'APP_PLATFORM := android-21',
+                "APP_CFLAG :=$androidFlags",
+        ]
+    }
 
     robovm {
         forceLinkClasses "java.lang.Class", "java.lang.Throwable", "party.iroiro.luajava.JuaAPI"
     }
     add(IOS, x64) {
         libraries = ''
-        xcframeworkBundleIdentifier = "party.iroiro.luajava.lua52"
+        xcframeworkBundleIdentifier = "party.iroiro.luajava.lua51"
         minIOSVersion = "11.0"
     }
 }
@@ -114,7 +101,7 @@ artifacts {
 
 tasks.named('jar') {
     manifest {
-        attributes('Automatic-Module-Name': 'party.iroiro.luajava.lua52')
+        attributes('Automatic-Module-Name': 'party.iroiro.luajava.lua51')
     }
 }
 
