@@ -108,6 +108,9 @@ jobs:
         run: |
           cd luajava
           chmod +x gradlew
+          echo $PATH
+          which aarch64-w64-mingw32-gcc || echo "not found"
+          ls /usr/local/llvm-mingw-20240619-ucrt-ubuntu-20.04-x86_64/bin
           ./gradlew --info --stacktrace jniGen jnigenBuildLinux jnigenBuildLinux64
           ./gradlew jniGen jnigenBuildLinuxARM jnigenBuildLinuxARM64
           # TODO: ./gradlew jniGen jnigenBuildLinuxRISCV64
