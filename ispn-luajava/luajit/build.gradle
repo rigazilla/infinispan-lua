@@ -154,11 +154,11 @@ buildLuaTargets(
                  'HOST_CC=gcc -m64', 'CFLAGS=-fPIC',
                  'BUILDMODE=static',
                  'CROSS=x86_64-w64-mingw32-', 'TARGET_SYS=Windows']),
-        // addLuaJitTarget(Platform.WinAArch64,
-        //         ['make', 'amalg',
-        //          'HOST_CC=gcc -m64', 'CFLAGS=-fPIC',
-        //          'BUILDMODE=static',
-        //          'CROSS=aarch64-w64-mingw32-', 'TARGET_SYS=Windows']),
+        addLuaJitTarget(Platform.WinAArch64,
+                ['make', 'amalg',
+                 'HOST_CC=gcc -m64', 'CFLAGS=-fPIC',
+                 'BUILDMODE=static',
+                 'CROSS=aarch64-w64-mingw32-', 'TARGET_SYS=Windows']),
         addLuaJitTarget(Platform.MacOsX,
                 ['make', 'amalg', 'TARGET_FLAGS=-arch x86_64',
                  'CFLAGS=-fPIC', 'TARGET_SYS=Darwin']),
@@ -207,9 +207,9 @@ jnigen {
     add(Windows, x64, x86, {
         linkerConfig(it, Platform.Win64)
     })
-    // add(Windows, x64, ARM) {
-    //     linkerConfig(it, Platform.WinAArch64)
-    // }
+    add(Windows, x64, ARM) {
+        linkerConfig(it, Platform.WinAArch64)
+    }
 
     add(MacOsX, x64, x86, {
         linkerConfig(it, Platform.MacOsXMerged)
@@ -263,7 +263,7 @@ tasks.jnigenBuildLinuxARM.dependsOn(tasks.buildLuaARM)
 tasks.jnigenBuildLinuxARM64.dependsOn(tasks.buildLuaAArch64)
 tasks.jnigenBuildWindows.dependsOn(tasks.buildLuaWin32)
 tasks.jnigenBuildWindows64.dependsOn(tasks.buildLuaWin64)
-// tasks.jnigenBuildWindowsARM64.dependsOn(tasks.buildLuaWinAArch64)
+tasks.jnigenBuildWindowsARM64.dependsOn(tasks.buildLuaWinAArch64)
 tasks.jnigenBuildMacOsX64.dependsOn(tasks.buildLuaMacOsXMerge)
 // tasks.jnigenBuildAndroid.dependsOn(tasks.buildLuaAndroid)
 tasks.jnigenBuildIOS64.dependsOn(tasks.buildLuaIOS)
