@@ -356,7 +356,7 @@ jobs:
       - name: Publish to local Maven repository
         run: |
           cd luajava
-          ./gradlew publishToMavenLocal
+          ./gradlew publishToMavenLocal -x sign -x signMavenJavaPublication -x signMavenPlatformPublication
       - name: Verify local Maven publication
         run: |
           echo "Listing lua51 artifacts in local Maven repository:"
