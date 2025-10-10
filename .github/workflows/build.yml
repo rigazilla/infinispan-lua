@@ -357,6 +357,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: natives
-          path: |
-            ./*/libs
-            ./**/*.jar
+          path: ./luajava/**/build/libs/*-natives-desktop.jar
