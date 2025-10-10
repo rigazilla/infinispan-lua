@@ -370,4 +370,4 @@ jobs:
           GITHUB_REF: ${{ github.ref }}
         run: |
           cd luajava
-          ./gradlew :lua51:publishMavenPlatformPublicationToOSSRHRepository --dry-run --info --stacktrace -Dorg.gradle.parallel=false
+          ./gradlew :lua51:publishMavenPlatformPublicationToOSSRHRepository --info --stacktrace -Dorg.gradle.parallel=false
