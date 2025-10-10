@@ -356,11 +356,11 @@ jobs:
       - name: Publish to local Maven repository
         run: |
           cd luajava
-          ./gradlew :lua51:publishMavenPlatformPublicationToMavenLocal -PskipSigning -PpublishOnlyDesktop=true
+          ./gradlew :infinispan-lua51:publishMavenPlatformPublicationToMavenLocal -PskipSigning -PpublishOnlyDesktop=true
       - name: Verify local Maven publication
         run: |
-          echo "Listing lua51 artifacts in local Maven repository:"
-          ls -lR $HOME/.m2/repository/party/iroiro/luajava/lua51/ || echo "lua51 artifacts not found"
+          echo "Listing infinispan-lua51 artifacts in local Maven repository:"
+          ls -lR $HOME/.m2/repository/party/iroiro/luajava/infinispan-lua51/ || echo "infinispan-lua51 artifacts not found"
           echo ""
           echo "Listing all luajava artifacts:"
           ls -lR $HOME/.m2/repository/party/iroiro/luajava/ || echo "luajava artifacts not found"
@@ -381,4 +381,4 @@ jobs:
           GITHUB_REF: ${{ github.ref }}
         run: |
           cd luajava
-          ./gradlew :lua51:publishMavenPlatformPublicationToOSSRHRepository -PpublishOnlyDesktop=true --info --stacktrace -Dorg.gradle.parallel=false
+          ./gradlew :infinispan-lua51:publishMavenPlatformPublicationToOSSRHRepository -PpublishOnlyDesktop=true --info --stacktrace -Dorg.gradle.parallel=false

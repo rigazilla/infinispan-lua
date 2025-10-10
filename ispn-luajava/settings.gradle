@@ -1,0 +1,14 @@
+rootProject.name = 'ispn-luajava'
+
+include 'lua51'
+include 'lua52'
+include 'lua53'
+include 'lua54'
+include 'luajit'
+include 'luaj'
+include 'luajava'
+include 'jsr223'
+include 'example'
+include 'android'
+
+project(':lua51').name = 'infinispan-lua51'
