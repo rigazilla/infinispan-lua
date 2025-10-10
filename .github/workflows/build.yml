@@ -348,17 +348,28 @@ jobs:
           ant -f lua53/jni/build.xml pack-natives
           ant -f lua54/jni/build.xml pack-natives
           ant -f luajit/jni/build.xml pack-natives
-      - name: Publish
+      - name: Build
         run: |
           cd luajava
           chmod +x gradlew
           ./gradlew build -x test
+      - name: Publish to local Maven repository
+        run: |
+          cd luajava
+          ./gradlew publishToMavenLocal
+      - name: Verify local Maven publication
+        run: |
+          echo "Listing lua51 artifacts in local Maven repository:"
+          ls -lR $HOME/.m2/repository/party/iroiro/luajava/lua51/ || echo "lua51 artifacts not found"
+          echo ""
+          echo "Listing all luajava artifacts:"
+          ls -lR $HOME/.m2/repository/party/iroiro/luajava/ || echo "luajava artifacts not found"
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: natives
           path: ./luajava/**/build/libs/*-natives-desktop.jar
-      - name: Publish
+      - name: Publish to OSSRH
         if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
