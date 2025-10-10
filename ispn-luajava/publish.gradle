@@ -41,16 +41,20 @@ configure([
                     mavenPlatform(MavenPublication) {
                         artifactId = artifactId + '-platform'
 
+                        def publishOnlyDesktop = project.hasProperty('publishOnlyDesktop') && project.property('publishOnlyDesktop') == 'true'
+
                         if (project.tasks.findByName('jnigenJarNativesDesktop')) {
                             artifact jnigenJarNativesDesktop {}
                         }
-                        if (project.tasks.findByName('jnigenJarNativesIOS')) {
+                        if (!publishOnlyDesktop && project.tasks.findByName('jnigenJarNativesIOS')) {
                             artifact jnigenJarNativesIOS {}
                         }
-                        // TODO: Add riscv64 to the list once Android NDK & jnigen supports RISC-V Android builds.
-                        ['arm64-v8a', 'armeabi-v7a', 'x86_64', 'x86'].each { arch ->
-                            if (project.tasks.findByName("jnigenJarNativesAndroid$arch")) {
-                                artifact "jnigenJarNativesAndroid$arch" {}
+                        if (!publishOnlyDesktop) {
+                            // TODO: Add riscv64 to the list once Android NDK & jnigen supports RISC-V Android builds.
+                            ['arm64-v8a', 'armeabi-v7a', 'x86_64', 'x86'].each { arch ->
+                                if (project.tasks.findByName("jnigenJarNativesAndroid$arch")) {
+                                    artifact "jnigenJarNativesAndroid$arch" {}
+                                }
                             }
                         }
                         setPom(pom, ' Native Libraries')
