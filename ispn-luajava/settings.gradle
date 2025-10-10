@@ -1,4 +1,4 @@
-rootProject.name = 'ispn-luajava'
+rootProject.name = 'luajava'
 
 include 'lua51'
 include 'lua52'
