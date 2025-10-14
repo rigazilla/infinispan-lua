@@ -5,7 +5,6 @@ name: Create Source Artifact
 
 # Controls when the workflow will run
 on:
-  pull_request:
   # Allows you to run this workflow manually from the Actions tab in GitHub
   workflow_dispatch:
     inputs:
