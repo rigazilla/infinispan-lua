@@ -22,6 +22,11 @@ on:
         description: 'Version number (e.g., 1.0.0 or 1.0.0-SNAPSHOT)'
         required: true
         type: string
+      group:
+        description: 'Maven group ID (e.g., org.infinispan)'
+        required: false
+        default: 'org.infinispan'
+        type: string
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -74,6 +79,7 @@ jobs:
       - name: Write version to file
         run: |
           echo "${{ inputs.version }}" > luajava/version.txt
+          echo "${{ inputs.group }}" > luajava/group.txt
 
       - name: Archive luajava folder
         uses: actions/upload-artifact@v4

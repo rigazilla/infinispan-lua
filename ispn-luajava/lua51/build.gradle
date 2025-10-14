@@ -5,6 +5,7 @@ buildscript {
     }
     dependencies {
         classpath 'com.badlogicgames.gdx:gdx-jnigen-gradle:2.5.2'
+        classpath 'com.vanniktech:gradle-maven-publish-plugin:0.28.0'
     }
 }
 
@@ -13,11 +14,15 @@ plugins {
     id 'java-library'
 }
 
+apply plugin: 'com.vanniktech.maven.publish'
+
+import com.vanniktech.maven.publish.SonatypeHost
+
 repositories {
     mavenCentral()
 }
 
-group = rootProject.group
+group = System.getenv('POM_GROUP') ?: 'org.infinispan'
 version = rootProject.version
 
 configurations {
@@ -111,3 +116,55 @@ tasks.withType(Jar).configureEach {
 
 
 tasks.jnigen.dependsOn(tasks.build)
+
+apply plugin: 'maven-publish'
+
+publishing {
+    publications {
+        mavenPlatform(MavenPublication) {
+            artifactId = 'infinispan-lua51-platform'
+            groupId = group
+            version = version.toString()
+
+            def publishOnlyDesktop = project.hasProperty('publishOnlyDesktop') && project.property('publishOnlyDesktop') == 'true'
+
+            if (project.tasks.findByName('jnigenJarNativesDesktop')) {
+                artifact jnigenJarNativesDesktop {}
+            }
+
+            pom {
+                name = System.getenv('POM_NAME') ?: 'Infinispan Lua 5.1 Platform'
+                description = System.getenv('POM_DESCRIPTION') ?: 'Infinispan Natives Lua 5.1'
+                url = System.getenv('POM_URL') ?: 'https://github.com/infinispan/infinispan-lua'
+
+                licenses {
+                    license {
+                        name = System.getenv('POM_LICENCE_NAME') ?: 'The MIT License'
+                        url = System.getenv('POM_LICENCE_URL') ?: 'http://www.opensource.org/licenses/mit-license.php'
+                        distribution = System.getenv('POM_LICENCE_DIST') ?: 'repo'
+                    }
+                }
+
+                developers {
+                    developer {
+                        id = System.getenv('POM_DEV_ID') ?: 'infinispan'
+                        name = System.getenv('POM_DEV_NAME') ?: 'Infinispan Team'
+                        email = System.getenv('POM_DEV_EMAIL') ?: 'vittorio@infinispan.org'
+                        url = System.getenv('POM_DEV_URL') ?: 'https://github.com/infinispan'
+                    }
+                }
+
+                scm {
+                    connection = System.getenv('POM_SCM_CONNECTION') ?: 'scm:git:git://github.com/infinispan/infinispan-lua.git'
+                    developerConnection = System.getenv('POM_SCM_DEV_CONNECTION') ?: 'scm:git:git://github.com/infinispan/infinispan-lua.git'
+                    url = System.getenv('POM_SCM_URL') ?: 'https://github.com/infinispan/infinispan-lua.git'
+                }
+            }
+        }
+    }
+}
+
+mavenPublishing {
+    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+    signAllPublications()
+}

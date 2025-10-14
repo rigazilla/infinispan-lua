@@ -40,6 +40,9 @@ jobs:
           if [ -f luajava/version.txt ]; then
             echo "VERSION=$(cat luajava/version.txt)" >> $GITHUB_ENV
           fi
+          if [ -f luajava/group.txt ]; then
+            echo "POM_GROUP=$(cat luajava/group.txt)" >> $GITHUB_ENV
+          fi
 
       - name: Set up JDK 8
         uses: actions/setup-java@v4
@@ -184,6 +187,9 @@ jobs:
           if [ -f luajava/version.txt ]; then
             echo "VERSION=$(cat luajava/version.txt)" >> $GITHUB_ENV
           fi
+          if [ -f luajava/group.txt ]; then
+            echo "POM_GROUP=$(cat luajava/group.txt)" >> $GITHUB_ENV
+          fi
       - name: Build natives
         run: |
           cd luajava
@@ -239,6 +245,9 @@ jobs:
         run: |
           if [ -f luajava/version.txt ]; then
             echo "VERSION=$(cat luajava/version.txt)" >> $GITHUB_ENV
+          fi
+          if [ -f luajava/group.txt ]; then
+            echo "POM_GROUP=$(cat luajava/group.txt)" >> $GITHUB_ENV
           fi
       - name: JniGen
         run: |
@@ -304,6 +313,10 @@ jobs:
             $version = Get-Content luajava/version.txt
             echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           }
+          if (Test-Path luajava/group.txt) {
+            $group = Get-Content luajava/group.txt
+            echo "POM_GROUP=$group" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
       - name: JniGen
         run: |
           cd luajava
@@ -362,6 +375,9 @@ jobs:
           if [ -f luajava/version.txt ]; then
             echo "VERSION=$(cat luajava/version.txt)" >> $GITHUB_ENV
           fi
+          if [ -f luajava/group.txt ]; then
+            echo "POM_GROUP=$(cat luajava/group.txt)" >> $GITHUB_ENV
+          fi
       - name: JniGen
         run: |
           cd luajava
@@ -401,16 +417,15 @@ jobs:
         with:
           name: natives
           path: ./luajava/**/build/libs/*-natives-desktop.jar
-      - name: Publish to OSSRH
-        if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
+      - name: Publish to Maven Central
+        if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') || contains(github.ref, 'publish') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
-          GPG_KEY_ID: ${{ secrets.SIGNING_KEY_ID }}
-          GPG_PASSPHRASE: ${{ secrets.SIGNING_PASSPHRASE }}
-          GPG_SECKEY: ${{ secrets.SIGNING_SECRET_KEY }}
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.SONATYPE_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.SONATYPE_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey:   ${{ secrets.INFINISPAN_MAVEN_GPG_ARMORED}}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.INFINISPAN_MAVEN_GPG_PASSPHRASE }}
           GITHUB_REF: ${{ github.ref }}
         run: |
           cd luajava
-          ./gradlew :lua51:publishMavenPlatformPublicationToOSSRHRepository -PpublishOnlyDesktop=true --info --stacktrace -Dorg.gradle.parallel=false
+          ./gradlew :lua51:publishMavenPlatformPublicationToMavenCentral -no-configuration-cache -PpublishOnlyDesktop=true --info --stacktrace -Dorg.gradle.parallel=false
