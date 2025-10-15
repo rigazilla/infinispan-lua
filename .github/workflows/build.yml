@@ -409,12 +409,8 @@ jobs:
           mvn dependency:copy \
             -Dartifact=org.infinispan:infinispan-lua51-platform:${VERSION}:pom \
             -DoutputDirectory=.
-          mv infinispan-lua51-platform-${VERSION}.pom pom.xml
-          xmlstarlet ed \
-              --subnode "/project" \
-              --type xml \
-              --name fragment \
-              --value "$(cat plugins.xml)" \
-              pom.xml
+          sed '$d' infinispan-lua51-platform-${VERSION}.pom > pom.xml
+          cat plugins.xml >> pom.xml
+          echo "</project>" >> pom.xml
           cat pom.xml
           mvn deploy
