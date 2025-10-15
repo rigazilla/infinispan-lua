@@ -418,6 +418,6 @@ jobs:
         env:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.INFINISPAN_MAVEN_GPG_PASSPHRASE }}
           MAVEN_GPG_KEY: ${{ secrets.INFINISPAN_MAVEN_GPG_ARMORED }}
-        run:
+        run: |
           cd maven-publish
           mvn -B deploy
