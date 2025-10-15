@@ -401,3 +401,20 @@ jobs:
         with:
           name: natives
           path: ./luajava/**/build/libs/*-natives-desktop.jar
+      - name: Copy build artifact with Maven
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xmlstarlet
+          cd maven-publish
+          mvn dependency:copy \
+            -Dartifact=org.infinispan:infinispan-lua51-platform:${VERSION}:pom \
+            -DoutputDirectory=.
+          mv infinispan-lua51-platform-${VERSION}.pom pom.xml
+          xmlstarlet ed \
+              --subnode "/project" \
+              --type xml \
+              --name fragment \
+              --value "$(cat plugins.xml)" \
+              pom.xml
+          cat pom.xml
+          mvn deploy
