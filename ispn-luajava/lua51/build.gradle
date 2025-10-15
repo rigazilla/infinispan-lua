@@ -155,6 +155,6 @@ publishing {
 }
 
 mavenPublishing {
-    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
-    signAllPublications()
+    publishToMavenCentral(SonatypeHost.S01)
+
 }
