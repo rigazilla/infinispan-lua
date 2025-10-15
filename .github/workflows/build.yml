@@ -395,7 +395,7 @@ jobs:
           echo "(org.infinispan) Listing infinispan-lua51 artifacts in local Maven repository:"
           ls -lR $HOME/.m2/repository/org/infinispan/ || echo "infinispan artifacts not found"
           ls -lR $HOME/.m2/repository/org/infinispan/infinispan-lua51-platform/ || echo "lua51 artifacts not found"
-          cat $HOME/.m2/repository/org/infinispan/infinispan-lua51-platform/1.0.0-SNAPSHOT/*.pom || echo "no POM"
+          cat $HOME/.m2/repository/org/infinispan/infinispan-lua51-platform/1.2.3-SNAPSHOT/*.pom || echo "no POM"
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
