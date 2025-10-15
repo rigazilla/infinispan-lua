@@ -406,11 +406,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xmlstarlet
           cd maven-publish
-          mvn dependency:copy \
+          mvn -B dependency:copy \
             -Dartifact=org.infinispan:infinispan-lua51-platform:${VERSION}:pom \
             -DoutputDirectory=.
           sed '$d' infinispan-lua51-platform-${VERSION}.pom > pom.xml
           cat plugins.xml >> pom.xml
           echo "</project>" >> pom.xml
           cat pom.xml
-          mvn deploy
+
+      - name: Deploy to Central Maven
+        env:
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.INFINISPAN_MAVEN_GPG_PASSPHRASE }}
+          MAVEN_GPG_KEY: ${{ secrets.INFINISPAN_MAVEN_GPG_ARMORED }}
+        run:
+          mvn -B deploy
