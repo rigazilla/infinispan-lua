@@ -1,20 +1,28 @@
-# .github/workflows/clone-repo.yml
+# Source artifact creation workflow
+#
+# This workflow creates a unified source artifact by combining:
+# 1. gudzpoz/luajava - Java/JNI bindings for Lua
+# 2. redis/redis deps/lua - Lua 5.1 native implementation
+# 3. ispn-luajava - Infinispan customizations and build configuration
+#
+# The resulting artifact contains all source code needed for the multi-platform
+# native library build workflow.
+#
+# Triggered by:
+# - Manual dispatch with customizable inputs
 
-# Name for the workflow, which will be displayed in the GitHub Actions tab
 name: Create Source Artifact
 
-# Controls when the workflow will run
 on:
-  # Allows you to run this workflow manually from the Actions tab in GitHub
   workflow_dispatch:
     inputs:
       luajava-branch:
-        description: 'Branch to checkout from gudzpoz/luajava'
+        description: 'Checkout branch for gudzpoz/luajava (empty=default)'
         required: false
         default: ''
         type: string
       redis-branch:
-        description: 'Branch to checkout from redis/redis'
+        description: 'Checkout branch for redis/redis (empty=default)'
         required: false
         default: ''
         type: string
@@ -22,59 +30,84 @@ on:
         description: 'Version number (e.g., 1.0.0 or 1.0.0-SNAPSHOT)'
         required: true
         type: string
+      maven-group-id:
+        description: 'Maven group ID (e.g., org.infinispan or com.example)'
+        required: false
+        default: 'org.infinispan'
+        type: string
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "clone-and-verify"
+  # Creates the source artifact by cloning and merging upstream repositories
   clone-and-verify:
-    # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Step 1: Checks out your repository under $GITHUB_WORKSPACE, so your job can access it.
+      # Checkout this repository to access ispn-luajava customizations
       - name: Checkout main repository
         uses: actions/checkout@v4
 
-      # Step 2: Clones the specified repository into the 'luajava' subfolder.
+      # Clone the upstream luajava repository with all submodules
       - name: Clone luajava repository
         uses: actions/checkout@v4
         with:
-          # The repository to clone. Format: owner/repo
           repository: 'gudzpoz/luajava'
-          # The destination path for the cloned repository.
           path: 'luajava'
-          # Branch to checkout (defaults to repo default branch if empty)
           ref: ${{ inputs.luajava-branch }}
           fetch-depth: 1
           submodules: true
 
-      # Step 3: Clones the "deps/lua" folder from "redis/redis" into the 'lua-native' subfolder.
+      # Clone only the Lua 5.1 implementation from redis/redis (sparse checkout)
+      # This is used to replace the default Lua implementation with Redis's fork
       - name: Clone redis/redis deps/lua folder
         uses: actions/checkout@v4
         with:
           repository: 'redis/redis'
           path: 'lua-native'
-          # Branch to checkout (defaults to repo default branch if empty)
           ref: ${{ inputs.redis-branch }}
           sparse-checkout: |
             deps/lua
           sparse-checkout-cone-mode: false
           fetch-depth: 1
 
+      # Replace the default Lua 5.1 native code with Redis's implementation
       - name: Replace luajava/lua51/jni/lua51 with lua-native content
         run: |
           rm -rf luajava/lua51/jni/lua51
           cp -r lua-native/deps/lua luajava/lua51/jni/lua51
 
+      # Apply Infinispan-specific customizations (build scripts, publishing config, etc.)
       - name: Replace luajava with ispn-luajava content
         run: |
           cp -r ispn-luajava/* luajava/
 
+      # Write version and Maven metadata to files for use in downstream workflows
       - name: Write version to file
         run: |
           echo "${{ inputs.version }}" > luajava/version.txt
+          echo "${{ inputs.maven-group-id }}" > luajava/maven-group-id.txt
 
+      # Create a properties file with all build inputs and metadata for traceability
+      - name: Write all input values to infinispan-build-info.properties
+        run: |
+          cat > luajava/infinispan-build-info.properties <<EOF
+          # Build information from workflow inputs
+          luajava.branch=${{ inputs.luajava-branch }}
+          redis.branch=${{ inputs.redis-branch }}
+          version=${{ inputs.version }}
+          maven.group.id=${{ inputs.maven-group-id }}
+
+          # Build metadata
+          github.workflow=${{ github.workflow }}
+          github.run.id=${{ github.run_id }}
+          github.run.number=${{ github.run_number }}
+          github.actor=${{ github.actor }}
+          github.ref=${{ github.ref }}
+          github.sha=${{ github.sha }}
+          build.timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          EOF
+
+      # Upload the complete source tree as a GitHub Actions artifact
+      # This artifact is consumed by the "Docker Build and Publish" workflow
       - name: Archive luajava folder
         uses: actions/upload-artifact@v4
         with:

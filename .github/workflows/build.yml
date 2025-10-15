@@ -1,10 +1,25 @@
+# Multi-platform native library build and publish workflow
+#
+# This workflow builds LuaJava native libraries for multiple platforms (Linux, Windows, macOS, iOS),
+# runs tests across different OS versions, packages the artifacts, and publishes to Maven Central.
+#
+# Workflow structure:
+# 1. most-natives: Builds Linux (x86, x86_64, ARM, ARM64) and Windows (x86, x86_64, ARM64) natives
+# 2. apple-natives: Builds macOS (x86_64, ARM64) and iOS natives
+# 3. linux-testing & windows-testing: Tests natives on different OS versions
+# 4. pack-and-publish-natives: Packages all natives and publishes to Maven Central
+#
+# Triggered by:
+# - Completion of "Create Source Artifact" workflow
+# - Manual dispatch with run-id parameter (unofficial feature)
+
 name: Docker Build and Publish
 
 on:
   workflow_run:
     workflows: [Create Source Artifact]
     types: [completed]
-  workflow_dispatch: 
+  workflow_dispatch:
     inputs:
       run-id:
         description: "The run ID of the workflow run that uploaded the luajava-folder artifact."
@@ -12,8 +27,10 @@ on:
         type: string
 
 jobs:
+  # Job 1: Build native libraries for Linux and Windows platforms
+  # Builds: Linux (x86, x86_64, ARM, ARM64) and Windows (x86, x86_64, ARM64)
+  # Uses cross-compilation toolchains and LLVM-MinGW for Windows builds
   most-natives:
-    environment: Codecov
     runs-on: ubuntu-latest
     container:
       image: ubuntu:20.04
@@ -39,6 +56,9 @@ jobs:
         run: |
           if [ -f luajava/version.txt ]; then
             echo "VERSION=$(cat luajava/version.txt)" >> $GITHUB_ENV
+          fi
+          if [ -f luajava/maven-group-id.txt ]; then
+            echo "MAVEN_GROUP_ID=$(cat luajava/maven-group-id.txt)" >> $GITHUB_ENV
           fi
 
       - name: Set up JDK 8
@@ -144,7 +164,6 @@ jobs:
             ./luajava/luaj/build/reports/jacoco/report.xml,
             ./luajava/luajava/build/reports/jacoco/report.xml,
             ./luajava/jsr223/build/reports/jacoco/report.xml
-          token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
           
       - name: Upload all output libs
@@ -156,6 +175,8 @@ jobs:
             ./luajava/**/*.jar
           retention-days: 5
 
+  # Job 2: Build native libraries for Apple platforms
+  # Builds: macOS (x86_64, ARM64) and iOS
   apple-natives:
     runs-on: macos-13
     env:
@@ -184,6 +205,9 @@ jobs:
           if [ -f luajava/version.txt ]; then
             echo "VERSION=$(cat luajava/version.txt)" >> $GITHUB_ENV
           fi
+          if [ -f luajava/maven-group-id.txt ]; then
+            echo "MAVEN_GROUP_ID=$(cat luajava/maven-group-id.txt)" >> $GITHUB_ENV
+          fi
       - name: Build natives
         run: |
           cd luajava
@@ -201,6 +225,8 @@ jobs:
           path: ./luajava/*/libs
           retention-days: 5
 
+  # Job 3: Test Linux natives on different glibc/musl versions
+  # Tests the built natives on Ubuntu 14.04 (glibc) and Alpine (musl)
   linux-testing:
     runs-on: ubuntu-latest
     needs:
@@ -240,6 +266,9 @@ jobs:
           if [ -f luajava/version.txt ]; then
             echo "VERSION=$(cat luajava/version.txt)" >> $GITHUB_ENV
           fi
+          if [ -f luajava/maven-group-id.txt ]; then
+            echo "MAVEN_GROUP_ID=$(cat luajava/maven-group-id.txt)" >> $GITHUB_ENV
+          fi
       - name: JniGen
         run: |
           cd luajava
@@ -263,6 +292,8 @@ jobs:
           sudo docker build -t ljtest-musl -f example/docker/musl/Dockerfile example/build/libs
           sudo docker run --rm ljtest-musl
 
+  # Job 4: Test Windows natives
+  # Validates the Windows builds work correctly
   windows-testing:
     runs-on: windows-latest
     needs:
@@ -304,6 +335,10 @@ jobs:
             $version = Get-Content luajava/version.txt
             echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           }
+          if (Test-Path luajava/maven-group-id.txt) {
+            $groupId = Get-Content luajava/maven-group-id.txt
+            echo "MAVEN_GROUP_ID=$groupId" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
       - name: JniGen
         run: |
           cd luajava
@@ -314,8 +349,12 @@ jobs:
           cd luajava
           chmod +x gradlew
           ./gradlew --info --stacktrace :example:test :jsr223:test :jpms-example:run
-  pack-natives:
-    environment: OSSRH
+
+  # Job 5: Package all natives and publish to Maven Central
+  # Combines all platform natives, signs them, and publishes:
+  # - SNAPSHOT versions to Sonatype Central snapshot repository
+  # - Release versions via Sonatype Portal API
+  pack-and-publish-natives:
     needs:
       - apple-natives
       - most-natives
@@ -362,6 +401,9 @@ jobs:
           if [ -f luajava/version.txt ]; then
             echo "VERSION=$(cat luajava/version.txt)" >> $GITHUB_ENV
           fi
+          if [ -f luajava/maven-group-id.txt ]; then
+            echo "MAVEN_GROUP_ID=$(cat luajava/maven-group-id.txt)" >> $GITHUB_ENV
+          fi
       - name: JniGen
         run: |
           cd luajava
@@ -381,36 +423,59 @@ jobs:
           cd luajava
           chmod +x gradlew
           ./gradlew build -x test
-      - name: Publish to local Maven repository
+      - name: Build platform sources JAR
         run: |
           cd luajava
-          ./gradlew :lua51:publishMavenPlatformPublicationToMavenLocal -PskipSigning -PpublishOnlyDesktop=true
-      - name: Verify local Maven publication
+          ./gradlew :lua51:platformSourcesJar
+      - name: Publish to local Maven repository
+        env:
+          GPG_SECKEY: ${{ secrets.INFINISPAN_MAVEN_GPG_ARMORED }}
+          GPG_PASSPHRASE: ${{ secrets.INFINISPAN_MAVEN_GPG_PASSPHRASE }}
         run: |
-          echo "Listing lua51 artifacts in local Maven repository:"
-          ls -lR $HOME/.m2/repository/party/iroiro/luajava/lua51/ || echo "lua51 artifacts not found"
-          echo ""
-          echo "Listing all luajava artifacts:"
-          ls -lR $HOME/.m2/repository/party/iroiro/luajava/ || echo "luajava artifacts not found"
-          echo "(org.infinispan) Listing infinispan-lua51 artifacts in local Maven repository:"
-          ls -lR $HOME/.m2/repository/org/infinispan/ || echo "infinispan artifacts not found"
-          ls -lR $HOME/.m2/repository/org/infinispan/infinispan-lua51-platform/ || echo "lua51 artifacts not found"
-          cat $HOME/.m2/repository/org/infinispan/infinispan-lua51-platform/1.0.0-SNAPSHOT/*.pom || echo "no POM"
+          cd luajava
+          ./gradlew :lua51:publishMavenPlatformPublicationToMavenLocal -PpublishOnlyDesktop=true
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: natives
           path: ./luajava/**/build/libs/*-natives-desktop.jar
-      - name: Publish to OSSRH
-        if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
+      - name: Publish to Central Sonatype (for SNAPSHOT)
+        # Artifacts will be available at "https://central.sonatype.com/repository/maven-snapshots/"
+        if: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && endsWith(env.VERSION, '-SNAPSHOT') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
-          GPG_KEY_ID: ${{ secrets.SIGNING_KEY_ID }}
-          GPG_PASSPHRASE: ${{ secrets.SIGNING_PASSPHRASE }}
-          GPG_SECKEY: ${{ secrets.SIGNING_SECRET_KEY }}
+          MAVEN_USERNAME: ${{ secrets.SONATYPE_CENTRAL_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.SONATYPE_CENTRAL_PASSWORD }}
+          GPG_PASSPHRASE: ${{ secrets.INFINISPAN_MAVEN_GPG_PASSPHRASE }}
+          GPG_SECKEY: ${{ secrets.INFINISPAN_MAVEN_GPG_ARMORED }}
           GITHUB_REF: ${{ github.ref }}
         run: |
           cd luajava
           ./gradlew :lua51:publishMavenPlatformPublicationToOSSRHRepository -PpublishOnlyDesktop=true --info --stacktrace -Dorg.gradle.parallel=false
+      - name: Publish with Sonatype Portal API (for Release)
+        if: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && !endsWith(env.VERSION, '-SNAPSHOT') }}
+        env:
+          MAVEN_USERNAME: ${{ secrets.SONATYPE_CENTRAL_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.SONATYPE_CENTRAL_PASSWORD }}
+        run: |
+          # Create base64 token securely without exposing credentials in logs
+          TOKEN=$(printf '%s:%s' "${MAVEN_USERNAME}" "${MAVEN_PASSWORD}" | base64 -w 0)
+          # Convert group ID to path (e.g., org.infinispan -> org/infinispan)
+          GROUP_PATH=$(echo ${MAVEN_GROUP_ID} | tr '.' '/')
+          # Add md5 sign
+          cd $HOME/.m2/repository/${GROUP_PATH}/infinispan-lua51-platform/${VERSION}
+          for f in *.pom *.jar; do
+            [ -f "$f" ] || continue       # Skip if no match
+            md5sum "$f" | awk '{print $1}' > "$f.md5"
+          done
+          for f in *.pom *.jar; do
+            [ -f "$f" ] || continue       # Skip if no match
+            sha1sum "$f" | awk '{print $1}' > "$f.sha1"
+          done
+          cd $HOME/.m2/repository
+          zip -r bundle.zip ${GROUP_PATH}/infinispan-lua51-platform/${VERSION} -x "*.xml"
+          curl --request POST \
+               --verbose \
+               --header "Authorization: Bearer ${TOKEN}" \
+               --form bundle=@bundle.zip \
+               https://central.sonatype.com/api/v1/publisher/upload
