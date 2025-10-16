@@ -445,4 +445,4 @@ jobs:
           MAVEN_PASSWORD: ${{ secrets.SONATYPE_CENTRAL_PASSWORD }}
         run: |
           cd maven-publish
-          mvn -B deploy -Dgpg.skip=true
+          mvn -B deploy -Dgpg.passphrase="${MAVEN_GPG_PASSPHRASE}"
