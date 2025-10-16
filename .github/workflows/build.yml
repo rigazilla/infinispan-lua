@@ -401,6 +401,9 @@ jobs:
         run: |
           cd luajava
           ./gradlew :lua51:publishMavenPlatformPublicationToMavenLocal -PskipSigning -PpublishOnlyDesktop=true
+          echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+          tree .
+          echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
       - name: Verify local Maven publication
         run: |
           echo "Listing all luajava artifacts:"
