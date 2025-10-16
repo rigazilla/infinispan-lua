@@ -421,32 +421,16 @@ jobs:
         with:
           name: natives
           path: ./luajava/**/build/libs/*-natives-desktop.jar
-      - name: Copy build artifact with Maven
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xmlstarlet
-          cd maven-publish
-          mvn -B dependency:copy \
-            -Dartifact=${MAVEN_GROUP_ID}:infinispan-lua51-platform:${VERSION}:pom \
-            -DoutputDirectory=.
-          sed '$d' infinispan-lua51-platform-${VERSION}.pom > pom.xml
-          cat plugins.xml >> pom.xml
-          echo "</project>" >> pom.xml
-          cat pom.xml
-      - name: Setup Java
-        uses: actions/setup-java@v5
-        with:
-          gpg-private-key: ${{ secrets.INFINISPAN_MAVEN_GPG_ARMORED }}
-          distribution: 'temurin'  # Must be provided
-          java-version: '17'
-          server-id: central
-          server-username: MAVEN_USERNAME
-          server-password: MAVEN_PASSWORD
-      - name: Deploy to Central Maven
+      - name: Publish with Sonatype Portal API
         env:
-          MAVEN_GPG_PASSPHRASE: ${{ secrets.INFINISPAN_MAVEN_GPG_PASSPHRASE }}
-          MAVEN_USERNAME: ${{ secrets.SONATYPE_CENTRAL_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.SONATYPE_CENTRAL_PASSWORD }}
+          TOKEN: ${{ secrets.SONATYPE_CENTRAL_TOKEN }}
         run: |
-          cd maven-publish
-          mvn -B deploy -Dgpg.passphrase="${MAVEN_GPG_PASSPHRASE}"
+          # Convert group ID to path (e.g., io.github.rigazilla -> io/github/rigazilla)
+          GROUP_PATH=$(echo ${MAVEN_GROUP_ID} | tr '.' '/')
+          cd $HOME/.m2/repository
+          zip -r bundle.zip ${GROUP_PATH}/infinispan-lua51-platform/${VERSION}
+          curl --request POST \
+               --verbose \
+               --header "Authorization: Bearer ${TOKEN}" \
+               --form bundle=@bundle.zip \
+               https://central.sonatype.com/api/v1/publisher/upload
