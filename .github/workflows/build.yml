@@ -424,4 +424,4 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.INFINISPAN_MAVEN_GPG_PASSPHRASE }}
         run: |
           cd maven-publish
-          mvn -B deploy
+          mvn -B deploy -Dgpg.skip=true
