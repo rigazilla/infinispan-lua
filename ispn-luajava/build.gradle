@@ -1,4 +1,8 @@
-group 'org.infinispan'
+def groupIdEnv = System.getenv('MAVEN_GROUP_ID')
+if (!groupIdEnv) {
+    groupIdEnv = 'org.infinispan'
+}
+group groupIdEnv
 
 def versionEnv = System.getenv('VERSION')
 if (!versionEnv) {
