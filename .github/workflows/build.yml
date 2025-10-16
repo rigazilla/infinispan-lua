@@ -419,9 +419,14 @@ jobs:
           gpg-private-key: ${{ secrets.INFINISPAN_MAVEN_GPG_ARMORED }}
           distribution: 'temurin'  # Must be provided
           java-version: '17'
+          server-id: central
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
       - name: Deploy to Central Maven
         env:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.INFINISPAN_MAVEN_GPG_PASSPHRASE }}
+          MAVEN_USERNAME: ${{ secrets.SONATYPE_CENTRAL_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.SONATYPE_CENTRAL_PASSWORD }}
         run: |
           cd maven-publish
           mvn -B deploy -Dgpg.skip=true
