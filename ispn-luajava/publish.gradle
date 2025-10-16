@@ -68,7 +68,6 @@ configure([
         signing {
             required { !project.hasProperty('skipSigning') }
             useInMemoryPgpKeys(
-                    System.getenv("GPG_KEY_ID"),
                     System.getenv("GPG_SECKEY"),
                     System.getenv("GPG_PASSPHRASE"),
             )
