@@ -58,6 +58,8 @@ configure([
                             }
                         }
                         setPom(pom, ' Native Libraries')
+
+                        pom.packaging = 'jar'
                     }
                 }
             }
