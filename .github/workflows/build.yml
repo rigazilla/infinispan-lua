@@ -398,9 +398,13 @@ jobs:
           chmod +x gradlew
           ./gradlew build -x test
       - name: Publish to local Maven repository
+        env:
+          GPG_KEY_ID: ${{ secrets.INFINISPAN_MAVEN_GPG_ID }}
+          GPG_SECKEY: ${{ secrets.INFINISPAN_MAVEN_GPG_ARMORED }}
+          GPG_PASSPHRASE: ${{ secrets.INFINISPAN_MAVEN_GPG_PASSPHRASE }}
         run: |
           cd luajava
-          ./gradlew :lua51:publishMavenPlatformPublicationToMavenLocal -PskipSigning -PpublishOnlyDesktop=true
+          ./gradlew :lua51:publishMavenPlatformPublicationToMavenLocal -PpublishOnlyDesktop=true
           echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
           tree .
           echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
