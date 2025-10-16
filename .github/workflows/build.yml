@@ -431,6 +431,16 @@ jobs:
         run: |
           # Convert group ID to path (e.g., io.github.rigazilla -> io/github/rigazilla)
           GROUP_PATH=$(echo ${MAVEN_GROUP_ID} | tr '.' '/')
+          # Add md5 sign
+          cd $HOME/.m2/repository/${GROUP_PATH}/infinispan-lua51-platform/${VERSION}
+          for f in *.pom *.jar; do
+            [ -f "$f" ] || continue       # Skip if no match
+            md5sum "$f" | awk '{print $1}' > "$f.md5"
+          done
+          for f in *.pom *.jar; do
+            [ -f "$f" ] || continue       # Skip if no match
+            sha1sum "$f" | awk '{print $1}' > "$f.md5"
+          done
           cd $HOME/.m2/repository
           zip -r bundle.zip ${GROUP_PATH}/infinispan-lua51-platform/${VERSION}
           curl --request POST \
