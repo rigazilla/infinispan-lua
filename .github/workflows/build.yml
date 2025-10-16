@@ -439,7 +439,7 @@ jobs:
           done
           for f in *.pom *.jar; do
             [ -f "$f" ] || continue       # Skip if no match
-            sha1sum "$f" | awk '{print $1}' > "$f.md5"
+            sha1sum "$f" | awk '{print $1}' > "$f.sha1"
           done
           cd $HOME/.m2/repository
           zip -r bundle.zip ${GROUP_PATH}/infinispan-lua51-platform/${VERSION}
