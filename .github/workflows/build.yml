@@ -442,7 +442,7 @@ jobs:
             sha1sum "$f" | awk '{print $1}' > "$f.sha1"
           done
           cd $HOME/.m2/repository
-          zip -r bundle.zip ${GROUP_PATH}/infinispan-lua51-platform/${VERSION}
+          zip -r bundle.zip ${GROUP_PATH}/infinispan-lua51-platform/${VERSION} -x "*.xml"
           curl --request POST \
                --verbose \
                --header "Authorization: Bearer ${TOKEN}" \
