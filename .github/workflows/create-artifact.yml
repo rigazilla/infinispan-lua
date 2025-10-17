@@ -81,6 +81,25 @@ jobs:
           echo "${{ inputs.version }}" > luajava/version.txt
           echo "${{ inputs.maven-group-id }}" > luajava/maven-group-id.txt
 
+      - name: Write all input values to infinispan-build-info.properties
+        run: |
+          cat > luajava/infinispan-build-info.properties <<EOF
+          # Build information from workflow inputs
+          luajava.branch=${{ inputs.luajava-branch }}
+          redis.branch=${{ inputs.redis-branch }}
+          version=${{ inputs.version }}
+          maven.group.id=${{ inputs.maven-group-id }}
+
+          # Build metadata
+          github.workflow=${{ github.workflow }}
+          github.run.id=${{ github.run_id }}
+          github.run.number=${{ github.run_number }}
+          github.actor=${{ github.actor }}
+          github.ref=${{ github.ref }}
+          github.sha=${{ github.sha }}
+          build.timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          EOF
+
       - name: Archive luajava folder
         uses: actions/upload-artifact@v4
         with:
