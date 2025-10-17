@@ -425,8 +425,8 @@ jobs:
         with:
           name: natives
           path: ./luajava/**/build/libs/*-natives-desktop.jar
-      - name: Publish to OSSRH
-        if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
+      - name: Publish to OSSRH (for SNAPSHOT)
+        if: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && endsWith(env.VERSION, '-SNAPSHOT') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MAVEN_USERNAME: ${{ secrets.SONATYPE_CENTRAL_USERNAME }}
@@ -438,26 +438,27 @@ jobs:
         run: |
           cd luajava
           ./gradlew :lua51:publishMavenPlatformPublicationToOSSRHRepository -PpublishOnlyDesktop=true --info --stacktrace -Dorg.gradle.parallel=false
-      # - name: Publish with Sonatype Portal API
-      #   env:
-      #     TOKEN: ${{ secrets.SONATYPE_CENTRAL_TOKEN }}
-      #   run: |
-      #     # Convert group ID to path (e.g., io.github.rigazilla -> io/github/rigazilla)
-      #     GROUP_PATH=$(echo ${MAVEN_GROUP_ID} | tr '.' '/')
-      #     # Add md5 sign
-      #     cd $HOME/.m2/repository/${GROUP_PATH}/infinispan-lua51-platform/${VERSION}
-      #     for f in *.pom *.jar; do
-      #       [ -f "$f" ] || continue       # Skip if no match
-      #       md5sum "$f" | awk '{print $1}' > "$f.md5"
-      #     done
-      #     for f in *.pom *.jar; do
-      #       [ -f "$f" ] || continue       # Skip if no match
-      #       sha1sum "$f" | awk '{print $1}' > "$f.sha1"
-      #     done
-      #     cd $HOME/.m2/repository
-      #     zip -r bundle.zip ${GROUP_PATH}/infinispan-lua51-platform/${VERSION} -x "*.xml"
-      #     curl --request POST \
-      #          --verbose \
-      #          --header "Authorization: Bearer ${TOKEN}" \
-      #          --form bundle=@bundle.zip \
-      #          https://central.sonatype.com/api/v1/publisher/upload
+      - name: Publish with Sonatype Portal API (for Release)
+        if: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && !endsWith(env.VERSION, '-SNAPSHOT') }}
+        env:
+          TOKEN: ${{ secrets.SONATYPE_CENTRAL_TOKEN }}
+        run: |
+          # Convert group ID to path (e.g., io.github.rigazilla -> io/github/rigazilla)
+          GROUP_PATH=$(echo ${MAVEN_GROUP_ID} | tr '.' '/')
+          # Add md5 sign
+          cd $HOME/.m2/repository/${GROUP_PATH}/infinispan-lua51-platform/${VERSION}
+          for f in *.pom *.jar; do
+            [ -f "$f" ] || continue       # Skip if no match
+            md5sum "$f" | awk '{print $1}' > "$f.md5"
+          done
+          for f in *.pom *.jar; do
+            [ -f "$f" ] || continue       # Skip if no match
+            sha1sum "$f" | awk '{print $1}' > "$f.sha1"
+          done
+          cd $HOME/.m2/repository
+          zip -r bundle.zip ${GROUP_PATH}/infinispan-lua51-platform/${VERSION} -x "*.xml"
+          curl --request POST \
+               --verbose \
+               --header "Authorization: Bearer ${TOKEN}" \
+               --form bundle=@bundle.zip \
+               https://central.sonatype.com/api/v1/publisher/upload
