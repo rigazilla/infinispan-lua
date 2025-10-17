@@ -109,5 +109,22 @@ tasks.withType(Jar).configureEach {
     archiveBaseName = 'infinispan-lua51-platform'
 }
 
+// Task to create a sources JAR from the project source files
+tasks.register('platformSourcesJar', Jar) {
+    archiveClassifier = 'sources'
+    archiveBaseName = 'infinispan-lua51-platform'
+    from project.projectDir.parentFile
+    include '**/*.java'
+    include '**/*.c'
+    include '**/*.h'
+    include '**/*.cpp'
+    include '**/*.hpp'
+    include '**/build.gradle'
+    include '**/build.gradle.kts'
+    include '**/*.md'
+    exclude '**/build/**'
+    exclude '**/.gradle/**'
+    exclude '**/.*/**'
+}
 
 tasks.jnigen.dependsOn(tasks.build)

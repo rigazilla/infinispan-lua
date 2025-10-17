@@ -57,6 +57,14 @@ configure([
                                 }
                             }
                         }
+
+                        // Include sources JAR for platform publication
+                        if (project.tasks.findByName('platformSourcesJar')) {
+                            artifact platformSourcesJar {
+                                classifier = 'sources'
+                            }
+                        }
+
                         setPom(pom, ' Native Libraries')
 
                         pom.packaging = 'jar'

@@ -1,10 +1,25 @@
+# Multi-platform native library build and publish workflow
+#
+# This workflow builds LuaJava native libraries for multiple platforms (Linux, Windows, macOS, iOS),
+# runs tests across different OS versions, packages the artifacts, and publishes to Maven Central.
+#
+# Workflow structure:
+# 1. most-natives: Builds Linux (x86, x86_64, ARM, ARM64) and Windows (x86, x86_64, ARM64) natives
+# 2. apple-natives: Builds macOS (x86_64, ARM64) and iOS natives
+# 3. linux-testing & windows-testing: Tests natives on different OS versions
+# 4. pack-and-publish-natives: Packages all natives and publishes to Maven Central
+#
+# Triggered by:
+# - Completion of "Create Source Artifact" workflow
+# - Manual dispatch with run-id parameter (unofficial feature)
+
 name: Docker Build and Publish
 
 on:
   workflow_run:
     workflows: [Create Source Artifact]
     types: [completed]
-  workflow_dispatch: 
+  workflow_dispatch:
     inputs:
       run-id:
         description: "The run ID of the workflow run that uploaded the luajava-folder artifact."
@@ -12,8 +27,10 @@ on:
         type: string
 
 jobs:
+  # Job 1: Build native libraries for Linux and Windows platforms
+  # Builds: Linux (x86, x86_64, ARM, ARM64) and Windows (x86, x86_64, ARM64)
+  # Uses cross-compilation toolchains and LLVM-MinGW for Windows builds
   most-natives:
-    environment: Codecov
     runs-on: ubuntu-latest
     container:
       image: ubuntu:20.04
@@ -147,7 +164,6 @@ jobs:
             ./luajava/luaj/build/reports/jacoco/report.xml,
             ./luajava/luajava/build/reports/jacoco/report.xml,
             ./luajava/jsr223/build/reports/jacoco/report.xml
-          token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
           
       - name: Upload all output libs
@@ -159,6 +175,8 @@ jobs:
             ./luajava/**/*.jar
           retention-days: 5
 
+  # Job 2: Build native libraries for Apple platforms
+  # Builds: macOS (x86_64, ARM64) and iOS
   apple-natives:
     runs-on: macos-13
     env:
@@ -207,6 +225,8 @@ jobs:
           path: ./luajava/*/libs
           retention-days: 5
 
+  # Job 3: Test Linux natives on different glibc/musl versions
+  # Tests the built natives on Ubuntu 14.04 (glibc) and Alpine (musl)
   linux-testing:
     runs-on: ubuntu-latest
     needs:
@@ -272,6 +292,8 @@ jobs:
           sudo docker build -t ljtest-musl -f example/docker/musl/Dockerfile example/build/libs
           sudo docker run --rm ljtest-musl
 
+  # Job 4: Test Windows natives
+  # Validates the Windows builds work correctly
   windows-testing:
     runs-on: windows-latest
     needs:
@@ -327,8 +349,12 @@ jobs:
           cd luajava
           chmod +x gradlew
           ./gradlew --info --stacktrace :example:test :jsr223:test :jpms-example:run
-  pack-natives:
-    environment: OSSRH
+
+  # Job 5: Package all natives and publish to Maven Central
+  # Combines all platform natives, signs them, and publishes:
+  # - SNAPSHOT versions to Sonatype Central snapshot repository
+  # - Release versions via Sonatype Portal API
+  pack-and-publish-natives:
     needs:
       - apple-natives
       - most-natives
@@ -397,6 +423,10 @@ jobs:
           cd luajava
           chmod +x gradlew
           ./gradlew build -x test
+      - name: Build platform sources JAR
+        run: |
+          cd luajava
+          ./gradlew :lua51:platformSourcesJar
       - name: Publish to local Maven repository
         env:
           GPG_KEY_ID: ${{ secrets.INFINISPAN_MAVEN_GPG_ID }}
@@ -405,27 +435,13 @@ jobs:
         run: |
           cd luajava
           ./gradlew :lua51:publishMavenPlatformPublicationToMavenLocal -PpublishOnlyDesktop=true
-          echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-          tree .
-          echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-      - name: Verify local Maven publication
-        run: |
-          echo "Listing all luajava artifacts:"
-          ls -lR $HOME/.m2/repository/party/iroiro/luajava/ || echo "luajava artifacts not found"
-          echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-          echo "(org.infinispan) Listing infinispan-lua51 artifacts in local Maven repository:"
-          ls -lR $HOME/.m2/repository/io/github/rigazilla || echo "infinispan artifacts not found"
-          echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-          ls -lR $HOME/.m2/repository/io/github/rigazilla/infinispan-lua51-platform/ || echo "lua51 artifacts not found"
-          echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-          cat $HOME/.m2/repository/io/github/rigazilla/infinispan-lua51-platform/${VERSION}/*.pom || echo "no POM"
-          echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: natives
           path: ./luajava/**/build/libs/*-natives-desktop.jar
-      - name: Publish to OSSRH (for SNAPSHOT)
+      - name: Publish to Central Sonatype (for SNAPSHOT)
+        # Artifacts will be available at "https://central.sonatype.com/repository/maven-snapshots/"
         if: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && endsWith(env.VERSION, '-SNAPSHOT') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -441,9 +457,12 @@ jobs:
       - name: Publish with Sonatype Portal API (for Release)
         if: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && !endsWith(env.VERSION, '-SNAPSHOT') }}
         env:
-          TOKEN: ${{ secrets.SONATYPE_CENTRAL_TOKEN }}
+          MAVEN_USERNAME: ${{ secrets.SONATYPE_CENTRAL_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.SONATYPE_CENTRAL_PASSWORD }}
         run: |
-          # Convert group ID to path (e.g., io.github.rigazilla -> io/github/rigazilla)
+          # Create base64 token securely without exposing credentials in logs
+          TOKEN=$(printf '%s:%s' "${MAVEN_USERNAME}" "${MAVEN_PASSWORD}" | base64 -w 0)
+          # Convert group ID to path (e.g., org.infinispan -> org/infinispan)
           GROUP_PATH=$(echo ${MAVEN_GROUP_ID} | tr '.' '/')
           # Add md5 sign
           cd $HOME/.m2/repository/${GROUP_PATH}/infinispan-lua51-platform/${VERSION}
