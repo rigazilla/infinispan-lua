@@ -9,12 +9,12 @@ on:
   workflow_dispatch:
     inputs:
       luajava-branch:
-        description: 'Branch to checkout from gudzpoz/luajava'
+        description: 'Branch to checkout from gudzpoz/luajava "main" if empty'
         required: false
         default: ''
         type: string
       redis-branch:
-        description: 'Branch to checkout from redis/redis'
+        description: 'Branch to checkout from redis/redis "main" if empty'
         required: false
         default: ''
         type: string
