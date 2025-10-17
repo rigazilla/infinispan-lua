@@ -425,6 +425,19 @@ jobs:
         with:
           name: natives
           path: ./luajava/**/build/libs/*-natives-desktop.jar
+      - name: Publish to OSSRH
+        if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MAVEN_USERNAME: ${{ secrets.SONATYPE_CENTRAL_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.SONATYPE_CENTRAL_PASSWORD }}
+          GPG_KEY_ID: ${{ secrets.INFINISPAN_MAVEN_GPG_ID }}
+          GPG_PASSPHRASE: ${{ secrets.INFINISPAN_MAVEN_GPG_PASSPHRASE }}
+          GPG_SECKEY: ${{ secrets.INFINISPAN_MAVEN_GPG_ARMORED }}
+          GITHUB_REF: ${{ github.ref }}
+        run: |
+          cd luajava
+          ./gradlew :lua51:publishMavenPlatformPublicationToOSSRHRepository -PpublishOnlyDesktop=true --info --stacktrace -Dorg.gradle.parallel=false
       - name: Publish with Sonatype Portal API
         env:
           TOKEN: ${{ secrets.SONATYPE_CENTRAL_TOKEN }}
