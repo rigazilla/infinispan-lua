@@ -109,6 +109,13 @@ tasks.withType(Jar).configureEach {
     archiveBaseName = 'infinispan-lua51-platform'
 }
 
+// Include COPYRIGHT file in native JARs
+tasks.matching { it.name.startsWith('jnigenJarNatives') && it instanceof Jar }.configureEach {
+    from('jni/lua51/COPYRIGHT') {
+        into 'META-INF'
+    }
+}
+
 // Task to create a sources JAR from the project source files
 tasks.register('platformSourcesJar', Jar) {
     archiveClassifier = 'sources'
