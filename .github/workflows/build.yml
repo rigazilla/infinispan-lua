@@ -120,14 +120,15 @@ jobs:
           wget https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz
           echo "Extracting ARM toolchain..."
           tar -xf arm-gnu-toolchain-13.2.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz -C /opt/
-          echo "Verifying extraction..."
-          ls -la /opt/arm-gnu-toolchain-13.2.rel1-x86_64-arm-none-linux-gnueabihf/bin/ | head -20
-          # Create symlinks with full paths
-          ln -sf /opt/arm-gnu-toolchain-13.2.rel1-x86_64-arm-none-linux-gnueabihf/bin/arm-none-linux-gnueabihf-gcc /usr/bin/arm-linux-gnueabihf-gcc
-          ln -sf /opt/arm-gnu-toolchain-13.2.rel1-x86_64-arm-none-linux-gnueabihf/bin/arm-none-linux-gnueabihf-g++ /usr/bin/arm-linux-gnueabihf-g++
+          echo "Checking what was extracted..."
+          ls -la /opt/
+          # Find the actual directory name
+          ARM_TOOLCHAIN_DIR=$(ls -d /opt/arm-gnu-toolchain-* | head -1)
+          echo "Found toolchain at: $ARM_TOOLCHAIN_DIR"
+          # Create symlinks with actual paths
+          ln -sf ${ARM_TOOLCHAIN_DIR}/bin/arm-none-linux-gnueabihf-gcc /usr/bin/arm-linux-gnueabihf-gcc
+          ln -sf ${ARM_TOOLCHAIN_DIR}/bin/arm-none-linux-gnueabihf-g++ /usr/bin/arm-linux-gnueabihf-g++
           # Verify installation
-          echo "Checking symlinks..."
-          ls -la /usr/bin/arm-linux-gnueabihf-*
           echo "Testing compiler..."
           /usr/bin/arm-linux-gnueabihf-gcc --version
 
