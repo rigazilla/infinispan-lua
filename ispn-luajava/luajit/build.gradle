@@ -269,55 +269,6 @@ tasks.jnigenBuildMacOsX64.dependsOn(tasks.buildLuaMacOsXMerge)
 tasks.jnigenBuildIOS64.dependsOn(tasks.buildLuaIOS)
 tasks.buildLuaIOS.dependsOn(tasks.jnigen)
 
-void addPatchElfTask(String platform) {
-    String target = "patchElf${platform}"
-    String folder = "libs/${platform.toLowerCase()}"
-    tasks.register(target) {
-        doLast {
-            String file = projectDir.toPath().resolve(folder).toFile().listFiles(new FilenameFilter() {
-                @Override
-                boolean accept(File file, String s) {
-                    return s.endsWith('.so')
-                }
-            })[0].toPath().toAbsolutePath().toString()
-            List<String> command = new ArrayList<>()
-            command.add('patchelf')
-            for (String symbol : ['dlclose',
-                                  'dlerror',
-                                  'dlopen',
-                                  'dlsym',
-                                  'exp',
-                                  'log',
-                                  'log2',
-                                  'pow']) {
-                command.add('--clear-symbol-version')
-                command.add(symbol)
-            }
-            command.add(file)
-            logger.lifecycle('$ patchelf --version')
-            exec {
-                workingDir folder
-                commandLine new ArrayList<>(['patchelf', '--version'])
-            }
-            logger.lifecycle('$ ' + command.join(' '))
-            exec {
-                workingDir folder
-                commandLine command
-            }
-        }
-    }
-}
-
-addPatchElfTask('Linux32')
-addPatchElfTask('Linux64')
-addPatchElfTask('LinuxARM32')
-addPatchElfTask('LinuxARM64')
-
-tasks.jnigenBuildLinux.finalizedBy(tasks.patchElfLinux32)
-tasks.jnigenBuildLinux64.finalizedBy(tasks.patchElfLinux64)
-tasks.jnigenBuildLinuxARM.finalizedBy(tasks.patchElfLinuxARM32)
-tasks.jnigenBuildLinuxARM64.finalizedBy(tasks.patchElfLinuxARM64)
-
 apply plugin: 'com.badlogicgames.gdx.gdx-jnigen'
 
 artifacts {
