@@ -129,20 +129,18 @@ jobs:
 
           # armhf (32-bit ARM) - Download and install ARM toolchain manually
           # CentOS Stream 9 doesn't have ARM hard-float cross-compiler in repos
-          echo "Downloading ARM toolchain..."
+          echo "Downloading ARM32 toolchain..."
           wget https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz
-          echo "Extracting ARM toolchain..."
+          echo "Extracting ARM32 toolchain..."
           tar -xf arm-gnu-toolchain-13.2.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz -C /opt/
-          echo "Checking what was extracted..."
-          ls -la /opt/
-          # Find the actual directory name
-          ARM_TOOLCHAIN_DIR=$(ls -d /opt/arm-gnu-toolchain-* | head -1)
-          echo "Found toolchain at: $ARM_TOOLCHAIN_DIR"
+          # Find the actual directory name for ARM32 toolchain (armhf)
+          ARM32_TOOLCHAIN_DIR=$(ls -d /opt/arm-gnu-toolchain-*-arm-none-linux-gnueabihf 2>/dev/null | head -1)
+          echo "Found ARM32 toolchain at: $ARM32_TOOLCHAIN_DIR"
           # Create symlinks with actual paths
-          ln -sf ${ARM_TOOLCHAIN_DIR}/bin/arm-none-linux-gnueabihf-gcc /usr/bin/arm-linux-gnueabihf-gcc
-          ln -sf ${ARM_TOOLCHAIN_DIR}/bin/arm-none-linux-gnueabihf-g++ /usr/bin/arm-linux-gnueabihf-g++
+          ln -sf ${ARM32_TOOLCHAIN_DIR}/bin/arm-none-linux-gnueabihf-gcc /usr/bin/arm-linux-gnueabihf-gcc
+          ln -sf ${ARM32_TOOLCHAIN_DIR}/bin/arm-none-linux-gnueabihf-g++ /usr/bin/arm-linux-gnueabihf-g++
           # Verify installation
-          echo "Testing compiler..."
+          echo "Testing ARM32 compiler..."
           /usr/bin/arm-linux-gnueabihf-gcc --version
 
           # Windows (MinGW cross-compilers)
