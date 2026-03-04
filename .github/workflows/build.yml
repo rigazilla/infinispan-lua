@@ -113,6 +113,9 @@ jobs:
 
           # arm64
           dnf install -y gcc-aarch64-linux-gnu gcc-c++-aarch64-linux-gnu
+          # Install ARM64 cross-compilation sysroot
+          dnf install -y glibc-aarch64-linux-gnu glibc-devel-aarch64-linux-gnu kernel-headers-aarch64-linux-gnu || \
+            echo "Warning: Some ARM64 sysroot packages not available"
 
           # armhf (32-bit ARM) - Download and install ARM toolchain manually
           # CentOS Stream 9 doesn't have ARM hard-float cross-compiler in repos
