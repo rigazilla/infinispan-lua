@@ -121,9 +121,10 @@ jobs:
           # Find the actual directory name for ARM64 toolchain
           ARM64_TOOLCHAIN_DIR=$(ls -d /opt/arm-gnu-toolchain-*-aarch64-none-linux-gnu 2>/dev/null | head -1)
           echo "Found ARM64 toolchain at: $ARM64_TOOLCHAIN_DIR"
-          # Create symlinks for ARM64
-          ln -sf ${ARM64_TOOLCHAIN_DIR}/bin/aarch64-none-linux-gnu-gcc /usr/bin/aarch64-linux-gnu-gcc
-          ln -sf ${ARM64_TOOLCHAIN_DIR}/bin/aarch64-none-linux-gnu-g++ /usr/bin/aarch64-linux-gnu-g++
+          # Create symlinks for all ARM64 tools
+          for tool in gcc g++ ar as ld objcopy objdump ranlib strip; do
+            ln -sf ${ARM64_TOOLCHAIN_DIR}/bin/aarch64-none-linux-gnu-${tool} /usr/bin/aarch64-linux-gnu-${tool}
+          done
           echo "Testing ARM64 compiler..."
           /usr/bin/aarch64-linux-gnu-gcc --version
 
