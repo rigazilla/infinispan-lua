@@ -136,9 +136,10 @@ jobs:
           # Find the actual directory name for ARM32 toolchain (armhf)
           ARM32_TOOLCHAIN_DIR=$(ls -d /opt/arm-gnu-toolchain-*-arm-none-linux-gnueabihf 2>/dev/null | head -1)
           echo "Found ARM32 toolchain at: $ARM32_TOOLCHAIN_DIR"
-          # Create symlinks with actual paths
-          ln -sf ${ARM32_TOOLCHAIN_DIR}/bin/arm-none-linux-gnueabihf-gcc /usr/bin/arm-linux-gnueabihf-gcc
-          ln -sf ${ARM32_TOOLCHAIN_DIR}/bin/arm-none-linux-gnueabihf-g++ /usr/bin/arm-linux-gnueabihf-g++
+          # Create symlinks for all ARM32 tools
+          for tool in gcc g++ ar as ld objcopy objdump ranlib strip; do
+            ln -sf ${ARM32_TOOLCHAIN_DIR}/bin/arm-none-linux-gnueabihf-${tool} /usr/bin/arm-linux-gnueabihf-${tool}
+          done
           # Verify installation
           echo "Testing ARM32 compiler..."
           /usr/bin/arm-linux-gnueabihf-gcc --version
