@@ -4,10 +4,12 @@
 # runs tests across different OS versions, packages the artifacts, and publishes to Maven Central.
 #
 # Workflow structure:
-# 1. most-natives: Builds Linux (x86, x86_64, ARM, ARM64) and Windows (x86, x86_64, ARM64) natives
-# 2. apple-natives: Builds macOS (x86_64, ARM64) and iOS natives
-# 3. linux-testing & windows-testing: Tests natives on different OS versions
-# 4. pack-and-publish-natives: Packages all natives and publishes to Maven Central
+# 1. x86-natives: Builds Linux (x86, x86_64) and Windows (x86, x86_64, ARM64) natives
+# 2. arm64-natives: Builds Linux ARM64 natives natively using QEMU
+# 3. arm32-natives: Builds Linux ARM32 natives natively using QEMU
+# 4. apple-natives: Builds macOS (x86_64, ARM64) and iOS natives
+# 5. linux-testing & windows-testing: Tests natives on different OS versions
+# 6. pack-and-publish-natives: Packages all natives and publishes to Maven Central
 #
 # Triggered by:
 # - Completion of "Create Source Artifact" workflow
@@ -27,10 +29,10 @@ on:
         type: string
 
 jobs:
-  # Job 1: Build native libraries for Linux and Windows platforms
-  # Builds: Linux (x86, x86_64, ARM, ARM64) and Windows (x86, x86_64, ARM64)
-  # Uses cross-compilation toolchains and LLVM-MinGW for Windows builds
-  most-natives:
+  # Job 1: Build native libraries for Linux x86/x86_64 and Windows platforms
+  # Builds: Linux (x86, x86_64) and Windows (x86, x86_64, ARM64)
+  # Uses LLVM-MinGW for Windows builds
+  x86-natives:
     runs-on: ubuntu-latest
     container:
       image: quay.io/centos/centos:stream9
@@ -100,7 +102,7 @@ jobs:
           tar -Jxf llvm-mingw-20240619-ucrt-ubuntu-20.04-x86_64.tar.xz -C /usr/local
           echo "/usr/local/llvm-mingw-20240619-ucrt-ubuntu-20.04-x86_64/bin" >> $GITHUB_PATH
           
-      - name: Install cross-compilation toolchains
+      - name: Install compilation toolchains
         run: |
           # Install dnf-plugins-core
           dnf install -y dnf-plugins-core
@@ -111,30 +113,8 @@ jobs:
           # x86 (32-bit)
           dnf install -y libstdc++-devel.i686 glibc-devel.i686
 
-          # ARM64 (aarch64) - Install from EPEL
-          echo "Installing ARM64 cross-compiler from EPEL..."
-          dnf install -y gcc-aarch64-linux-gnu gcc-c++-aarch64-linux-gnu binutils-aarch64-linux-gnu
-          # Create compatibility symlinks (EPEL uses aarch64-linux-gnu, build expects aarch64-none-linux-gnu)
-          for tool in gcc g++ ar as ld objcopy objdump ranlib strip; do
-            ln -sf /usr/bin/aarch64-linux-gnu-${tool} /usr/bin/aarch64-none-linux-gnu-${tool}
-          done
-          echo "Testing ARM64 compiler..."
-          aarch64-linux-gnu-gcc --version
-
-          # ARM32 - Install from EPEL
-          echo "Installing ARM32 cross-compiler from EPEL..."
-          dnf install -y gcc-arm-linux-gnu binutils-arm-linux-gnu
-          # Create compatibility symlinks (EPEL uses arm-linux-gnu, build expects arm-none-linux-gnueabihf)
-          for tool in gcc g++ ar as ld objcopy objdump ranlib strip; do
-            ln -sf /usr/bin/arm-linux-gnu-${tool} /usr/bin/arm-none-linux-gnueabihf-${tool}
-          done
-          echo "Testing ARM32 compiler..."
-          arm-linux-gnu-gcc --version
-
           # Windows (MinGW cross-compilers)
           dnf install -y mingw64-gcc mingw64-gcc-c++ mingw32-gcc mingw32-gcc-c++ zlib.i686
-
-          # TODO: riscv64
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
@@ -147,9 +127,7 @@ jobs:
           which aarch64-w64-mingw32-gcc || echo "not found"
           ls /usr/local/llvm-mingw-20240619-ucrt-ubuntu-20.04-x86_64/bin
           ./gradlew --info --stacktrace jniGen jnigenBuildLinux jnigenBuildLinux64
-          ./gradlew jniGen jnigenBuildLinuxARM jnigenBuildLinuxARM64
-          # TODO: ./gradlew jniGen jnigenBuildLinuxRISCV64
-          ./gradlew jniGen jnigenBuildWindows jnigenBuildWindows64 jnigenBuildWindowsARM64 # skip jnigenBuildAndroid
+          ./gradlew jniGen jnigenBuildWindows jnigenBuildWindows64 jnigenBuildWindowsARM64
           
       - name: Test (Desktop)
         run: |
@@ -175,16 +153,86 @@ jobs:
             ./luajava/jsr223/build/reports/jacoco/report.xml
           verbose: true
           
-      - name: Upload all output libs
+      - name: Upload x86 natives
         uses: actions/upload-artifact@v4
         with:
-          name: most-natives
+          name: x86-natives
           path: |
             ./luajava/*/libs
             ./luajava/**/*.jar
           retention-days: 5
 
-  # Job 2: Build native libraries for Apple platforms
+  # Job 2: Build ARM64 native libraries
+  # Runs natively on ARM64 runner with CentOS Stream 9
+  arm64-natives:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - name: Download luajava folder artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: luajava-folder
+          path: luajava
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run-id || github.event.workflow_run.id }}
+      - name: Build in CentOS Stream 9 ARM64 container
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v $(pwd)/luajava:/workspace \
+            -w /workspace \
+            quay.io/centos/centos:stream9 \
+            /bin/bash -c "
+              dnf install -y java-17-openjdk-devel gcc gcc-c++ make wget unzip
+              export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+              chmod +x gradlew
+              ./gradlew jniGen jnigenBuildLinuxARM64
+            "
+      - name: Upload ARM64 natives
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm64-natives
+          path: ./luajava/*/libs
+          retention-days: 5
+
+  # Job 3: Build ARM32 native libraries
+  # Runs natively on ARM32 runner with CentOS Stream 9
+  arm32-natives:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm
+      - name: Download luajava folder artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: luajava-folder
+          path: luajava
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run-id || github.event.workflow_run.id }}
+      - name: Build in CentOS Stream 9 ARM32 container
+        run: |
+          docker run --rm --platform linux/arm/v7 \
+            -v $(pwd)/luajava:/workspace \
+            -w /workspace \
+            quay.io/centos/centos:stream9 \
+            /bin/bash -c "
+              dnf install -y java-17-openjdk-devel gcc gcc-c++ make wget unzip
+              export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+              chmod +x gradlew
+              ./gradlew jniGen jnigenBuildLinuxARM
+            "
+      - name: Upload ARM32 natives
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm32-natives
+          path: ./luajava/*/libs
+          retention-days: 5
+
+  # Job 4: Build native libraries for Apple platforms
   # Builds: macOS (x86_64, ARM64) and iOS
   apple-natives:
     runs-on: macos-13
@@ -239,7 +287,9 @@ jobs:
   linux-testing:
     runs-on: ubuntu-latest
     needs:
-      - most-natives
+      - x86-natives
+      - arm64-natives
+      - arm32-natives
     steps:
       - uses: actions/checkout@v4
         with:
@@ -258,10 +308,20 @@ jobs:
       - run: echo "JAVA_11=$JAVA_HOME" >> $GITHUB_ENV
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
-      - name: Download most-natives artifact
+      - name: Download x86 natives artifact
         uses: actions/download-artifact@v4
         with:
-          name: most-natives
+          name: x86-natives
+          path: luajava
+      - name: Download ARM64 natives artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: arm64-natives
+          path: luajava
+      - name: Download ARM32 natives artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: arm32-natives
           path: luajava
       - name: Download luajava folder artifact
         uses: actions/download-artifact@v4
@@ -300,7 +360,9 @@ jobs:
   windows-testing:
     runs-on: windows-latest
     needs:
-      - most-natives
+      - x86-natives
+      - arm64-natives
+      - arm32-natives
     steps:
       - uses: actions/checkout@v4
         with:
@@ -319,10 +381,20 @@ jobs:
       - run: echo "JAVA_11=$JAVA_HOME" >> $GITHUB_ENV
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
-      - name: Download most-natives artifact
+      - name: Download x86 natives artifact
         uses: actions/download-artifact@v4
         with:
-          name: most-natives
+          name: x86-natives
+          path: luajava
+      - name: Download ARM64 natives artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: arm64-natives
+          path: luajava
+      - name: Download ARM32 natives artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: arm32-natives
           path: luajava
       - name: Download luajava folder artifact
         uses: actions/download-artifact@v4
@@ -360,7 +432,9 @@ jobs:
   pack-and-publish-natives:
     needs:
       - apple-natives
-      - most-natives
+      - x86-natives
+      - arm64-natives
+      - arm32-natives
       - windows-testing
       - linux-testing
     runs-on: ubuntu-22.04
@@ -387,10 +461,20 @@ jobs:
         with:
           name: apple-natives
           path: luajava
-      - name: Download most-natives artifact
+      - name: Download x86-natives artifact
         uses: actions/download-artifact@v4
         with:
-          name: most-natives
+          name: x86-natives
+          path: luajava
+      - name: Download arm64-natives artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: arm64-natives
+          path: luajava
+      - name: Download arm32-natives artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: arm32-natives
           path: luajava
       - name: Download luajava folder artifact
         uses: actions/download-artifact@v4
