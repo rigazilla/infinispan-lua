@@ -190,7 +190,12 @@ jobs:
             -e MAVEN_GROUP_ID="${MAVEN_GROUP_ID}" \
             quay.io/centos/centos:stream9 \
             /bin/bash -c "
-              dnf install -y java-17-openjdk-devel gcc gcc-c++ make wget unzip
+              # Install EPEL and enable CRB for ant
+              dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+              dnf install -y dnf-plugins-core
+              dnf config-manager --set-enabled crb
+              # Install build dependencies
+              dnf install -y java-17-openjdk-devel gcc gcc-c++ make wget unzip ant
               export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
               # Create symlinks so build scripts can find compilers with expected names
               ln -sf /usr/bin/gcc /usr/bin/aarch64-linux-gnu-gcc
