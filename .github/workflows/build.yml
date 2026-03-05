@@ -180,9 +180,15 @@ jobs:
           run-id: ${{ inputs.run-id || github.event.workflow_run.id }}
       - name: Build in CentOS Stream 9 ARM64 container
         run: |
+          # Read version from artifact
+          VERSION=$(cat luajava/version.txt 2>/dev/null || echo "unknown")
+          MAVEN_GROUP_ID=$(cat luajava/maven-group-id.txt 2>/dev/null || echo "unknown")
+
           docker run --rm --platform linux/arm64 \
             -v $(pwd)/luajava:/workspace \
             -w /workspace \
+            -e VERSION="${VERSION}" \
+            -e MAVEN_GROUP_ID="${MAVEN_GROUP_ID}" \
             quay.io/centos/centos:stream9 \
             /bin/bash -c "
               dnf install -y java-17-openjdk-devel gcc gcc-c++ make wget unzip
@@ -215,9 +221,15 @@ jobs:
           run-id: ${{ inputs.run-id || github.event.workflow_run.id }}
       - name: Build in CentOS Stream 9 ARM32 container
         run: |
+          # Read version from artifact
+          VERSION=$(cat luajava/version.txt 2>/dev/null || echo "unknown")
+          MAVEN_GROUP_ID=$(cat luajava/maven-group-id.txt 2>/dev/null || echo "unknown")
+
           docker run --rm --platform linux/arm/v7 \
             -v $(pwd)/luajava:/workspace \
             -w /workspace \
+            -e VERSION="${VERSION}" \
+            -e MAVEN_GROUP_ID="${MAVEN_GROUP_ID}" \
             quay.io/centos/centos:stream9 \
             /bin/bash -c "
               dnf install -y java-17-openjdk-devel gcc gcc-c++ make wget unzip
