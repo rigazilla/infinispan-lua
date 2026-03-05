@@ -193,8 +193,8 @@ jobs:
               export HOST_CFLAGS='-O2'
               chmod +x gradlew
               ./gradlew jniGen jnigenBuildLinuxARM64
-              # Build JARs including natives-desktop JAR
-              ./gradlew build -x test
+              # Build JARs including natives-desktop JAR (exclude Android and test)
+              ./gradlew build -x test -x :android:build
             "
       - name: Upload ARM64 natives
         uses: actions/upload-artifact@v4
