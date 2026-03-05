@@ -4,11 +4,10 @@
 # runs tests across different OS versions, packages the artifacts, and publishes to Maven Central.
 #
 # Workflow structure:
-# 1. x86-natives: Builds Linux (x86, x86_64) and Windows (x86, x86_64, ARM64) natives
+# 1. x86-natives: Builds Linux (x86, x86_64) and Windows (x86, x86_64) natives
 # 2. arm64-natives: Builds Linux ARM64 natives natively using QEMU
-# 3. apple-natives: Builds macOS (x86_64, ARM64) and iOS natives
-# 4. linux-testing & windows-testing: Tests natives on different OS versions
-# 5. pack-and-publish-natives: Packages all natives and publishes to Maven Central
+# 3. linux-testing & windows-testing: Tests natives on different OS versions
+# 4. pack-and-publish-natives: Packages all natives and publishes to Maven Central
 #
 # Triggered by:
 # - Completion of "Create Source Artifact" workflow
@@ -86,21 +85,6 @@ jobs:
           # Install ant from EPEL
           dnf install -y ant
 
-      - name: Download llvm-mingw
-        uses: robinraju/release-downloader@v1.10
-        with:
-          repository: 'mstorsjo/llvm-mingw'
-          tag: 20240619
-          fileName: llvm-mingw-20240619-ucrt-ubuntu-20.04-x86_64.tar.xz
-          tarBall: false
-          zipBall: false
-          
-      - name: Set up llvm-mingw
-        run: |
-          mkdir -p /usr/local
-          tar -Jxf llvm-mingw-20240619-ucrt-ubuntu-20.04-x86_64.tar.xz -C /usr/local
-          echo "/usr/local/llvm-mingw-20240619-ucrt-ubuntu-20.04-x86_64/bin" >> $GITHUB_PATH
-          
       - name: Install compilation toolchains
         run: |
           # Install dnf-plugins-core
@@ -122,11 +106,8 @@ jobs:
         run: |
           cd luajava
           chmod +x gradlew
-          echo $PATH
-          which aarch64-w64-mingw32-gcc || echo "not found"
-          ls /usr/local/llvm-mingw-20240619-ucrt-ubuntu-20.04-x86_64/bin
           ./gradlew --info --stacktrace jniGen jnigenBuildLinux jnigenBuildLinux64
-          ./gradlew jniGen jnigenBuildWindows jnigenBuildWindows64 jnigenBuildWindowsARM64
+          ./gradlew jniGen jnigenBuildWindows jnigenBuildWindows64
           
       - name: Test (Desktop)
         run: |
@@ -220,57 +201,7 @@ jobs:
           path: ./luajava/*/libs
           retention-days: 5
 
-  # Job 3: Build native libraries for Apple platforms
-  # Builds: macOS (x86_64, ARM64) and iOS
-  apple-natives:
-    runs-on: macos-13
-    env:
-      MACOSX_DEPLOYMENT_TARGET: "10.10"
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: 'recursive'
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-      - run: echo "JAVA_17=$JAVA_HOME" >> $GITHUB_ENV
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v3
-      - name: Download luajava folder artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: luajava-folder
-          path: luajava
-          github-token: ${{ github.token }}
-          run-id: ${{ inputs.run-id || github.event.workflow_run.id }}
-      - name: Set version from artifact
-        run: |
-          if [ -f luajava/version.txt ]; then
-            echo "VERSION=$(cat luajava/version.txt)" >> $GITHUB_ENV
-          fi
-          if [ -f luajava/maven-group-id.txt ]; then
-            echo "MAVEN_GROUP_ID=$(cat luajava/maven-group-id.txt)" >> $GITHUB_ENV
-          fi
-      - name: Build natives
-        run: |
-          cd luajava
-          chmod +x gradlew
-          ./gradlew jniGen jnigenBuildMacOsX64 jnigenBuildMacOsXARM64 jnigenBuildIOS
-      - name: Test
-        run: |
-          cd luajava
-          chmod +x gradlew
-          ./gradlew :example:test :jsr223:test :jpms-example:run
-      - name: Upload macOS natives
-        uses: actions/upload-artifact@v4
-        with:
-          name: apple-natives
-          path: ./luajava/*/libs
-          retention-days: 5
-
-  # Job 3: Test Linux natives on different glibc/musl versions
+  # Job 3: Test Linux natives on CentOS Stream 9
   # Tests the built natives on Ubuntu 14.04 (glibc) and Alpine (musl)
   linux-testing:
     runs-on: ubuntu-latest
@@ -407,7 +338,6 @@ jobs:
   # - Release versions via Sonatype Portal API
   pack-and-publish-natives:
     needs:
-      - apple-natives
       - x86-natives
       - arm64-natives
       - windows-testing
@@ -431,11 +361,6 @@ jobs:
       - run: echo "JAVA_11=$JAVA_HOME" >> $GITHUB_ENV
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
-      - name: Download apple-natives artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: apple-natives
-          path: luajava
       - name: Download x86-natives artifact
         uses: actions/download-artifact@v4
         with:
