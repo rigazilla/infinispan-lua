@@ -111,39 +111,25 @@ jobs:
           # x86 (32-bit)
           dnf install -y libstdc++-devel.i686 glibc-devel.i686
 
-          # arm64 - Download complete toolchain with sysroot
-          echo "Downloading ARM64 toolchain..."
-          wget https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
-          echo "Extracting ARM64 toolchain..."
-          tar -xf arm-gnu-toolchain-13.2.rel1-x86_64-aarch64-none-linux-gnu.tar.xz -C /opt/
-          echo "Checking what was extracted..."
-          ls -la /opt/
-          # Find the actual directory name for ARM64 toolchain
-          ARM64_TOOLCHAIN_DIR=$(ls -d /opt/arm-gnu-toolchain-*-aarch64-none-linux-gnu 2>/dev/null | head -1)
-          echo "Found ARM64 toolchain at: $ARM64_TOOLCHAIN_DIR"
-          # Create symlinks for all ARM64 tools
+          # ARM64 (aarch64) - Install from EPEL
+          echo "Installing ARM64 cross-compiler from EPEL..."
+          dnf install -y gcc-aarch64-linux-gnu gcc-c++-aarch64-linux-gnu binutils-aarch64-linux-gnu
+          # Create compatibility symlinks (EPEL uses aarch64-linux-gnu, build expects aarch64-none-linux-gnu)
           for tool in gcc g++ ar as ld objcopy objdump ranlib strip; do
-            ln -sf ${ARM64_TOOLCHAIN_DIR}/bin/aarch64-none-linux-gnu-${tool} /usr/bin/aarch64-linux-gnu-${tool}
+            ln -sf /usr/bin/aarch64-linux-gnu-${tool} /usr/bin/aarch64-none-linux-gnu-${tool}
           done
           echo "Testing ARM64 compiler..."
-          /usr/bin/aarch64-linux-gnu-gcc --version
+          aarch64-linux-gnu-gcc --version
 
-          # armhf (32-bit ARM) - Download and install ARM toolchain manually
-          # CentOS Stream 9 doesn't have ARM hard-float cross-compiler in repos
-          echo "Downloading ARM32 toolchain..."
-          wget https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz
-          echo "Extracting ARM32 toolchain..."
-          tar -xf arm-gnu-toolchain-13.2.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz -C /opt/
-          # Find the actual directory name for ARM32 toolchain (armhf)
-          ARM32_TOOLCHAIN_DIR=$(ls -d /opt/arm-gnu-toolchain-*-arm-none-linux-gnueabihf 2>/dev/null | head -1)
-          echo "Found ARM32 toolchain at: $ARM32_TOOLCHAIN_DIR"
-          # Create symlinks for all ARM32 tools
+          # ARM32 - Install from EPEL
+          echo "Installing ARM32 cross-compiler from EPEL..."
+          dnf install -y gcc-arm-linux-gnu binutils-arm-linux-gnu
+          # Create compatibility symlinks (EPEL uses arm-linux-gnu, build expects arm-none-linux-gnueabihf)
           for tool in gcc g++ ar as ld objcopy objdump ranlib strip; do
-            ln -sf ${ARM32_TOOLCHAIN_DIR}/bin/arm-none-linux-gnueabihf-${tool} /usr/bin/arm-linux-gnueabihf-${tool}
+            ln -sf /usr/bin/arm-linux-gnu-${tool} /usr/bin/arm-none-linux-gnueabihf-${tool}
           done
-          # Verify installation
           echo "Testing ARM32 compiler..."
-          /usr/bin/arm-linux-gnueabihf-gcc --version
+          arm-linux-gnu-gcc --version
 
           # Windows (MinGW cross-compilers)
           dnf install -y mingw64-gcc mingw64-gcc-c++ mingw32-gcc mingw32-gcc-c++ zlib.i686
