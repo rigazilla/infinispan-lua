@@ -6,10 +6,9 @@
 # Workflow structure:
 # 1. x86-natives: Builds Linux (x86, x86_64) and Windows (x86, x86_64, ARM64) natives
 # 2. arm64-natives: Builds Linux ARM64 natives natively using QEMU
-# 3. arm32-natives: Builds Linux ARM32 natives natively using QEMU
-# 4. apple-natives: Builds macOS (x86_64, ARM64) and iOS natives
-# 5. linux-testing & windows-testing: Tests natives on different OS versions
-# 6. pack-and-publish-natives: Packages all natives and publishes to Maven Central
+# 3. apple-natives: Builds macOS (x86_64, ARM64) and iOS natives
+# 4. linux-testing & windows-testing: Tests natives on different OS versions
+# 5. pack-and-publish-natives: Packages all natives and publishes to Maven Central
 #
 # Triggered by:
 # - Completion of "Create Source Artifact" workflow
@@ -193,6 +192,16 @@ jobs:
             /bin/bash -c "
               dnf install -y java-17-openjdk-devel gcc gcc-c++ make wget unzip
               export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+              # Create symlinks so build scripts can find compilers with expected names
+              ln -sf /usr/bin/gcc /usr/bin/aarch64-linux-gnu-gcc
+              ln -sf /usr/bin/g++ /usr/bin/aarch64-linux-gnu-g++
+              ln -sf /usr/bin/ar /usr/bin/aarch64-linux-gnu-ar
+              ln -sf /usr/bin/as /usr/bin/aarch64-linux-gnu-as
+              ln -sf /usr/bin/ld /usr/bin/aarch64-linux-gnu-ld
+              ln -sf /usr/bin/objcopy /usr/bin/aarch64-linux-gnu-objcopy
+              ln -sf /usr/bin/objdump /usr/bin/aarch64-linux-gnu-objdump
+              ln -sf /usr/bin/ranlib /usr/bin/aarch64-linux-gnu-ranlib
+              ln -sf /usr/bin/strip /usr/bin/aarch64-linux-gnu-strip
               chmod +x gradlew
               ./gradlew jniGen jnigenBuildLinuxARM64
             "
@@ -203,48 +212,7 @@ jobs:
           path: ./luajava/*/libs
           retention-days: 5
 
-  # Job 3: Build ARM32 native libraries
-  # Runs natively on ARM32 runner with CentOS Stream 9
-  arm32-natives:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm
-      - name: Download luajava folder artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: luajava-folder
-          path: luajava
-          github-token: ${{ github.token }}
-          run-id: ${{ inputs.run-id || github.event.workflow_run.id }}
-      - name: Build in CentOS Stream 9 ARM32 container
-        run: |
-          # Read version from artifact
-          VERSION=$(cat luajava/version.txt 2>/dev/null || echo "unknown")
-          MAVEN_GROUP_ID=$(cat luajava/maven-group-id.txt 2>/dev/null || echo "unknown")
-
-          docker run --rm --platform linux/arm/v7 \
-            -v $(pwd)/luajava:/workspace \
-            -w /workspace \
-            -e VERSION="${VERSION}" \
-            -e MAVEN_GROUP_ID="${MAVEN_GROUP_ID}" \
-            quay.io/centos/centos:stream9 \
-            /bin/bash -c "
-              dnf install -y java-17-openjdk-devel gcc gcc-c++ make wget unzip
-              export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
-              chmod +x gradlew
-              ./gradlew jniGen jnigenBuildLinuxARM
-            "
-      - name: Upload ARM32 natives
-        uses: actions/upload-artifact@v4
-        with:
-          name: arm32-natives
-          path: ./luajava/*/libs
-          retention-days: 5
-
-  # Job 4: Build native libraries for Apple platforms
+  # Job 3: Build native libraries for Apple platforms
   # Builds: macOS (x86_64, ARM64) and iOS
   apple-natives:
     runs-on: macos-13
@@ -301,7 +269,6 @@ jobs:
     needs:
       - x86-natives
       - arm64-natives
-      - arm32-natives
     steps:
       - uses: actions/checkout@v4
         with:
@@ -329,11 +296,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: arm64-natives
-          path: luajava
-      - name: Download ARM32 natives artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: arm32-natives
           path: luajava
       - name: Download luajava folder artifact
         uses: actions/download-artifact@v4
@@ -374,7 +336,6 @@ jobs:
     needs:
       - x86-natives
       - arm64-natives
-      - arm32-natives
     steps:
       - uses: actions/checkout@v4
         with:
@@ -402,11 +363,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: arm64-natives
-          path: luajava
-      - name: Download ARM32 natives artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: arm32-natives
           path: luajava
       - name: Download luajava folder artifact
         uses: actions/download-artifact@v4
@@ -446,7 +402,6 @@ jobs:
       - apple-natives
       - x86-natives
       - arm64-natives
-      - arm32-natives
       - windows-testing
       - linux-testing
     runs-on: ubuntu-22.04
@@ -482,11 +437,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: arm64-natives
-          path: luajava
-      - name: Download arm32-natives artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: arm32-natives
           path: luajava
       - name: Download luajava folder artifact
         uses: actions/download-artifact@v4
