@@ -202,6 +202,8 @@ jobs:
               ln -sf /usr/bin/objdump /usr/bin/aarch64-linux-gnu-objdump
               ln -sf /usr/bin/ranlib /usr/bin/aarch64-linux-gnu-ranlib
               ln -sf /usr/bin/strip /usr/bin/aarch64-linux-gnu-strip
+              # Set HOST_CC to use native gcc without x86-specific flags
+              export HOST_CC='gcc'
               chmod +x gradlew
               ./gradlew jniGen jnigenBuildLinuxARM64
             "
