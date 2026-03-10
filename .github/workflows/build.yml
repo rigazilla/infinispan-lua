@@ -421,6 +421,11 @@ jobs:
           if [ -f luajava/maven-group-id.txt ]; then
             echo "MAVEN_GROUP_ID=$(cat luajava/maven-group-id.txt)" >> $GITHUB_ENV
           fi
+          if [ -f luajava/skip-publish.txt ]; then
+            echo "SKIP_PUBLISH=$(cat luajava/skip-publish.txt)" >> $GITHUB_ENV
+          else
+            echo "SKIP_PUBLISH=false" >> $GITHUB_ENV
+          fi
       - name: JniGen
         run: |
           cd luajava
@@ -458,7 +463,7 @@ jobs:
           path: ./luajava/**/build/libs/*-natives-desktop.jar
       - name: Publish to Central Sonatype (for SNAPSHOT)
         # Artifacts will be available at "https://central.sonatype.com/repository/maven-snapshots/"
-        if: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && endsWith(env.VERSION, '-SNAPSHOT') }}
+        if: ${{ env.SKIP_PUBLISH != 'true' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && endsWith(env.VERSION, '-SNAPSHOT') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MAVEN_USERNAME: ${{ secrets.SONATYPE_CENTRAL_USERNAME }}
@@ -470,7 +475,7 @@ jobs:
           cd luajava
           ./gradlew :lua51:publishMavenPlatformPublicationToOSSRHRepository -PpublishOnlyDesktop=true --info --stacktrace -Dorg.gradle.parallel=false
       - name: Publish with Sonatype Portal API (for Release)
-        if: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && !endsWith(env.VERSION, '-SNAPSHOT') }}
+        if: ${{ env.SKIP_PUBLISH != 'true' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && !endsWith(env.VERSION, '-SNAPSHOT') }}
         env:
           MAVEN_USERNAME: ${{ secrets.SONATYPE_CENTRAL_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.SONATYPE_CENTRAL_PASSWORD }}
