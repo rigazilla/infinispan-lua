@@ -16,6 +16,20 @@ name: Create Source Artifact
 on:
   workflow_dispatch:
     inputs:
+      skip_publish:
+        description: 'Skip Maven publishing in the build workflow'
+        required: false
+        default: false
+        type: boolean
+      version:
+        description: 'Version number (e.g., 1.0.0 or 1.0.0-SNAPSHOT)'
+        required: true
+        type: string
+      maven-group-id:
+        description: 'Maven group ID (e.g., org.infinispan or com.example)'
+        required: false
+        default: 'org.infinispan'
+        type: string
       luajava-branch:
         description: 'Checkout branch for gudzpoz/luajava (empty=default)'
         required: false
@@ -25,15 +39,6 @@ on:
         description: 'Checkout branch for redis/redis (empty=default)'
         required: false
         default: ''
-        type: string
-      version:
-        description: 'Version number (e.g., 1.0.0 or 1.0.0-SNAPSHOT)'
-        required: true
-        type: string
-      maven-group-id:
-        description: 'Maven group ID (e.g., org.infinispan or com.example)'
-        required: false
-        default: 'org.infinispan'
         type: string
 
 jobs:
@@ -85,6 +90,7 @@ jobs:
         run: |
           echo "${{ inputs.version }}" > luajava/version.txt
           echo "${{ inputs.maven-group-id }}" > luajava/maven-group-id.txt
+          echo "${{ inputs.skip_publish }}" > luajava/skip-publish.txt
 
       # Create a properties file with all build inputs and metadata for traceability
       - name: Write all input values to infinispan-build-info.properties
@@ -95,6 +101,7 @@ jobs:
           redis.branch=${{ inputs.redis-branch }}
           version=${{ inputs.version }}
           maven.group.id=${{ inputs.maven-group-id }}
+          skip.publish=${{ inputs.skip_publish }}
 
           # Build metadata
           github.workflow=${{ github.workflow }}
@@ -105,6 +112,47 @@ jobs:
           github.sha=${{ github.sha }}
           build.timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           EOF
+
+      # Push the artifact content to an orphan branch for persistence
+      - name: Push to orphan branch
+        run: |
+          cd luajava
+          
+          # Remove all git-related files and GitHub workflows to start fresh
+          rm -rf .git .gitmodules .github
+          find . -name ".git" -type f -delete
+          
+          # Configure git
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Initialize as a new git repository
+          git init
+          git add .
+          git commit -m "Source artifact for version ${{ inputs.version }}
+          
+          Build Info:
+          - LuaJava branch: ${{ inputs.luajava-branch || 'default' }}
+          - Redis branch: ${{ inputs.redis-branch || 'default' }}
+          - Maven Group ID: ${{ inputs.maven-group-id }}
+          - Workflow Run: ${{ github.run_id }}
+          - Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          
+          # Create orphan branch name without timestamp
+          BRANCH_NAME="artifact/${{ inputs.version }}"
+
+          # Check if branch already exists
+          if git ls-remote --heads "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" ${BRANCH_NAME} | grep -q ${BRANCH_NAME}; then
+            echo "Error: Branch ${BRANCH_NAME} already exists!"
+            echo "Please delete/remove the existing branch or use a different version number."
+            exit 1
+          fi
+          
+          # Push to orphan branch
+          git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:refs/heads/${BRANCH_NAME}
+          
+          echo "Artifact pushed to branch: ${BRANCH_NAME}"
+          echo "ARTIFACT_BRANCH=${BRANCH_NAME}" >> $GITHUB_ENV
 
       # Upload the complete source tree as a GitHub Actions artifact
       # This artifact is consumed by the "Docker Build and Publish" workflow
