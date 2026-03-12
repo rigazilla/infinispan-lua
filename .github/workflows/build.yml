@@ -285,11 +285,7 @@ jobs:
       - run: echo "JAVA_11=$JAVA_HOME" >> $GITHUB_ENV
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
-      - name: Download most-natives artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: most-natives
-          path: luajava
+
       - name: Checkout ref
         if: inputs.ref != ''
         uses: actions/checkout@v4
@@ -306,6 +302,12 @@ jobs:
           path: luajava
           github-token: ${{ github.token }}
           run-id: ${{ inputs.run-id || github.event.workflow_run.id }}
+
+      - name: Download most-natives artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: most-natives
+          path: luajava
       - name: Set version from artifact
         run: |
           if [ -f luajava/version.txt ]; then
@@ -355,11 +357,7 @@ jobs:
       - run: echo "JAVA_11=$JAVA_HOME" >> $GITHUB_ENV
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
-      - name: Download most-natives artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: most-natives
-          path: luajava
+
       - name: Checkout ref
         if: inputs.ref != ''
         uses: actions/checkout@v4
@@ -376,6 +374,12 @@ jobs:
           path: luajava
           github-token: ${{ github.token }}
           run-id: ${{ inputs.run-id || github.event.workflow_run.id }}
+
+      - name: Download most-natives artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: most-natives
+          path: luajava
       - name: Set version from artifact
         shell: pwsh
         run: |
