@@ -138,10 +138,15 @@ jobs:
           - Workflow Run: ${{ github.run_id }}
           - Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           
-          # Create orphan branch name with timestamp
-          TIMESTAMP=$(date -u +"%Y%m%d-%H%M%S")
-          BRANCH_NAME="artifact/${{ inputs.version }}-${TIMESTAMP}"
+          BRANCH_NAME="artifact/${{ inputs.version }}"
           
+          # Check if branch already exists
+          if git ls-remote --heads "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" ${BRANCH_NAME} | grep -q ${BRANCH_NAME}; then
+            echo "Error: Branch ${BRANCH_NAME} already exists!"
+            echo "Please delete the existing branch or use a different version number."
+            exit 1
+          fi
+
           # Push to orphan branch
           git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:refs/heads/${BRANCH_NAME}
           
