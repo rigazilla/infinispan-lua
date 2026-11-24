@@ -1,0 +1,170 @@
+buildscript {
+    repositories {
+        mavenLocal()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.badlogicgames.gdx:gdx-jnigen-gradle:2.5.2'
+    }
+}
+
+plugins {
+    id 'java'
+    id 'java-library'
+}
+
+repositories {
+    mavenCentral()
+}
+
+group = rootProject.group
+version = rootProject.version
+
+configurations {
+    desktopNatives {
+        canBeConsumed = true
+        canBeResolved = false
+    }
+
+    instrumentedJars {
+        canBeConsumed = true
+        canBeResolved = false
+        extendsFrom api, implementation, runtimeOnly
+    }
+}
+
+dependencies {
+    api project(':luajava')
+
+    // Infinispan: functional tests for the Redis data modules (RedisModulesTest)
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.2'
+}
+
+apply plugin: 'com.badlogicgames.gdx.gdx-jnigen'
+
+jnigen {
+    sharedLibName = 'lua51'
+
+    all {
+        headerDirs = ['../../jni/luajava', 'mod', 'lua51/src', 'lua51/etc']
+        cppExcludes = ['lua51/**/*']
+        cExcludes = ['lua51/**/*']
+        libraries = ' -lm '
+    }
+
+    add(Windows, x32)
+    add(Windows, x64)
+    add(Windows, x64, ARM)
+
+    add(Linux, x32)
+    add(Linux, x64)
+    add(Linux, x32, ARM)
+    add(Linux, x64, ARM)
+    // TODO: Until we have a RISCV toolchain on Ubuntu.
+    // add(Linux, x64, RISCV)
+    each({ it.os == Linux }) {
+        String linuxFlags = ' -D_FORTIFY_SOURCE=0 -DLUA_USE_DLOPEN '
+        cFlags += linuxFlags
+        cppFlags += linuxFlags
+    }
+
+    add(MacOsX, x64)
+    add(MacOsX, x64, ARM)
+    each({ it.os == MacOsX }) {
+        String macFlags = ' -DLUA_USE_DLOPEN '
+        libraries = ''
+        cFlags += macFlags
+        cppFlags += macFlags
+    }
+
+    add(Android) {
+        String androidFlags = ' -D_FORTIFY_SOURCE=1 -DLUA_USE_DLOPEN '
+        cFlags += androidFlags
+        cppFlags += androidFlags
+        androidApplicationMk = [
+                'APP_PLATFORM := android-21',
+                "APP_CFLAG :=$androidFlags",
+        ]
+    }
+
+    robovm {
+        forceLinkClasses "java.lang.Class", "java.lang.Throwable", "party.iroiro.luajava.JuaAPI"
+    }
+    add(IOS, x64) {
+        libraries = ''
+        xcframeworkBundleIdentifier = "party.iroiro.luajava.lua51"
+        minIOSVersion = "11.0"
+    }
+}
+
+artifacts {
+    instrumentedJars(jar)
+    desktopNatives(jnigenJarNativesDesktop)
+}
+
+tasks.named('jar') {
+    manifest {
+        attributes('Automatic-Module-Name': 'party.iroiro.luajava.lua51')
+    }
+}
+
+tasks.withType(Jar).configureEach {
+    archiveBaseName = 'infinispan-lua51-platform'
+}
+
+// Include COPYRIGHT file in native JARs
+tasks.matching { it.name.startsWith('jnigenJarNatives') && it instanceof Jar }.configureEach {
+    from('jni/lua51/COPYRIGHT') {
+        into 'META-INF'
+    }
+}
+
+// Task to create a sources JAR from the project source files
+tasks.register('platformSourcesJar', Jar) {
+    archiveClassifier = 'sources'
+    archiveBaseName = 'infinispan-lua51-platform'
+    from project.projectDir.parentFile
+    include '**/*.java'
+    include '**/*.c'
+    include '**/*.h'
+    include '**/*.cpp'
+    include '**/*.hpp'
+    include '**/build.gradle'
+    include '**/build.gradle.kts'
+    include '**/*.md'
+    exclude '**/build/**'
+    exclude '**/.gradle/**'
+    exclude '**/.*/**'
+}
+
+tasks.jnigen.dependsOn(tasks.build)
+
+// Infinispan: the Redis-module functional tests need the built native on the
+// classpath. They must NOT run in the normal build lifecycle, because the
+// native is produced later in the task graph (jnigenBuildLinux64 -> jnigen ->
+// build), which would both fail (no .so yet) and form a dependency cycle if
+// `test` depended on it. So exclude them from `test` and run them via the
+// dedicated `redisModuleTest` task after the native has been built (in a
+// separate gradle invocation).
+test {
+    useJUnitPlatform()
+    exclude '**/RedisModulesTest*'
+}
+
+// gdx's SharedLibraryLoader loads the .so as a classpath resource at root
+// (libs/linux64/liblua5164.so -> "/liblua5164.so"), hence files(libs/linux64).
+// Build the native first:  ./gradlew :lua51:jnigenBuildLinux64
+// then run:                ./gradlew :lua51:redisModuleTest
+tasks.register('redisModuleTest', Test) {
+    group = 'verification'
+    description = 'Functional tests for the Redis data modules (cjson/cmsgpack/struct/bit) against the host native'
+    dependsOn 'testClasses'
+    useJUnitPlatform()
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath + files("$projectDir/libs/linux64")
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        exceptionFormat 'full'
+    }
+}
